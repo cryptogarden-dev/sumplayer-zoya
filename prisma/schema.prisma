@@ -1,0 +1,632 @@
+// Skema Prisma - Tahap 1 (Fondasi) + Tahap 3 (Supplier & Produk).
+// Model pesanan/penerimaan barang (Tahap 5) dan produk setara (Tahap 4)
+// akan ditambahkan pada tahap berikutnya sesuai docs/DATA_MODEL.md.
+//
+// Catatan penyesuaian terhadap docs/DATA_MODEL.md (didokumentasikan juga
+// di docs/DATA_MODEL.md §30):
+// - `BaseUnit` dibatasi ke 3 nilai kanonik per family (KILOGRAM/LITER/PCS),
+//   bukan 6 nilai `MeasurementUnit`, agar taat pada mesin konversi Tahap 2
+//   (src/lib/domain/units) yang selalu menormalkan ke basis kanonik per
+//   family - satu sumber kebenaran, tidak ada nilai dasar alternatif.
+// - `SupplierProduct.contentUnit` ditambahkan (tidak eksplisit di tabel
+//   §12 DATA_MODEL.md) karena `resolvePackage()` (packaging.ts Tahap 2)
+//   mensyaratkan satuan eksplisit untuk `contentPerItem` sebelum dikonversi
+//   ke satuan dasar - dibutuhkan mesin hitung, bukan hanya tampilan.
+// - `product_equivalence_groups` (DATA_MODEL.md §10) sengaja BELUM
+//   ditambahkan; field itu baru bermakna saat halaman Bandingkan (Tahap 4)
+//   dibangun.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Peran pengguna dalam sebuah bisnis (R26).
+enum BusinessUserRole {
+  owner_admin
+  staff
+}
+
+/// Tenant / usaha pemilik data. Semua data bisnis lain diisolasi melalui
+/// business_id yang merujuk ke tabel ini (R26, ARCHITECTURE.md ss4).
+model Business {
+  id                     String   @id @default(uuid()) @db.Uuid
+  name                   String
+  ownerName              String   @map("owner_name")
+  defaultAddress         String?  @map("default_address")
+  timezone               String   @default("Asia/Jakarta")
+  /// Ambang "data lama" (hari) untuk peringatan freshness harga/stok pada
+  /// penawaran produk supplier (poin 7 Tahap 3). Dapat diatur Pemilik/Admin,
+  /// tidak hardcode di kode aplikasi.
+  staleDataThresholdDays Int      @default(7) @map("stale_data_threshold_days")
+  isActive               Boolean  @default(true) @map("is_active")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  businessUsers             BusinessUser[]
+  productCategories         ProductCategory[]
+  products                  Product[]
+  suppliers                 Supplier[]
+  supplierContacts          SupplierContact[]
+  supplierDeliveryAreas     SupplierDeliveryArea[]
+  supplierDeliverySchedules SupplierDeliverySchedule[]
+  taxRates                  TaxRate[]
+  supplierProducts          SupplierProduct[]
+  supplierPrices            SupplierPrice[]
+  supplierStocks            SupplierStock[]
+  shippingRules             ShippingRule[]
+  shippingRuleAreas         ShippingRuleArea[]
+  businessLocations         BusinessLocation[]
+  purchaseOrders            PurchaseOrder[]
+  purchaseOrderItems        PurchaseOrderItem[]
+
+  @@map("businesses")
+}
+
+/// Akun pengguna (login). Satu pengguna dapat tergabung ke lebih dari satu
+/// bisnis melalui BusinessUser.
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  name         String
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  businessUsers           BusinessUser[]
+  createdProducts         Product[]
+  createdSuppliers        Supplier[]
+  createdTaxRates         TaxRate[]
+  createdSupplierProducts SupplierProduct[]
+  createdSupplierPrices   SupplierPrice[]
+  updatedSupplierStocks   SupplierStock[]
+  createdShippingRules    ShippingRule[]
+  createdPurchaseOrders   PurchaseOrder[]
+
+  @@map("users")
+}
+
+/// Relasi many-to-many User <-> Business beserta peran (R26).
+model BusinessUser {
+  id         String           @id @default(uuid()) @db.Uuid
+  businessId String           @map("business_id") @db.Uuid
+  userId     String           @map("user_id") @db.Uuid
+  role       BusinessUserRole
+  isActive   Boolean          @default(true) @map("is_active")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, userId])
+  @@index([userId])
+  @@index([businessId])
+  @@map("business_users")
+}
+
+// ---------------------------------------------------------------------------
+// Tahap 3: Supplier, Produk, Penawaran, Ongkir, Riwayat Harga
+// (docs/DATA_MODEL.md §4-16, docs/IMPLEMENTATION_PLAN.md Tahap 3)
+// ---------------------------------------------------------------------------
+
+/// Satuan pengukuran baku (harus identik dengan
+/// src/lib/domain/units/types.ts#MEASUREMENT_UNITS - satu sumber kebenaran
+/// untuk mesin konversi Tahap 2, R04).
+enum MeasurementUnit {
+  GRAM
+  KILOGRAM
+  MILLILITER
+  LITER
+  PCS
+  LUSIN
+}
+
+/// Dimensi/family satuan (harus identik dengan
+/// src/lib/domain/units/types.ts#UNIT_FAMILIES, R05).
+enum UnitFamily {
+  WEIGHT
+  VOLUME
+  COUNT
+}
+
+/// Satuan dasar kanonik per family (harus identik dengan
+/// src/lib/domain/units/types.ts#BaseUnit - HANYA 3 nilai, bukan 6, agar
+/// selaras dengan `BASE_UNIT_BY_FAMILY` di mesin konversi Tahap 2).
+enum BaseUnit {
+  KILOGRAM
+  LITER
+  PCS
+}
+
+/// Jenis kemasan deskriptif (harus identik dengan
+/// src/lib/domain/units/types.ts#PACKAGING_TYPES, R04).
+enum PackagingType {
+  DUS
+  PAK
+  KARUNG
+  BOTOL
+  KALENG
+  SAK
+  BAL
+  TRAY
+  BOX
+  RENCENG
+}
+
+/// Status pajak (harus identik dengan
+/// src/lib/domain/pricing/types.ts#TAX_STATUSES, R07).
+enum TaxStatus {
+  INCLUDED
+  EXCLUDED
+  NONE
+}
+
+/// Status ketersediaan stok (harus identik dengan
+/// src/lib/domain/pricing/types.ts#AVAILABILITY_STATUSES, R09).
+enum AvailabilityStatus {
+  TERSEDIA
+  STOK_TERBATAS
+  KOSONG
+  PRE_ORDER
+  PERLU_KONFIRMASI
+}
+
+/// Mode ongkir (harus identik dengan
+/// src/lib/domain/pricing/types.ts#SHIPPING_MODES, R08).
+enum ShippingMode {
+  GRATIS_TANPA_SYARAT
+  GRATIS_MIN_PEMBELIAN
+  TETAP
+  BERDASARKAN_AREA
+  PICKUP
+  PERLU_KONFIRMASI
+}
+
+/// Kategori produk per bisnis (R02).
+model ProductCategory {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  name       String
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([businessId, name])
+  @@index([businessId])
+  @@map("product_categories")
+}
+
+/// Master produk (R02). SKU unik per bisnis; `unitFamily` menentukan
+/// `baseUnit` yang valid (dipaksa di service layer, bukan hanya form).
+model Product {
+  id          String     @id @default(uuid()) @db.Uuid
+  businessId  String     @map("business_id") @db.Uuid
+  sku         String
+  barcode     String?
+  productName String     @map("product_name")
+  brand       String?
+  variant     String?
+  categoryId  String?    @map("category_id") @db.Uuid
+  photoUrl    String?    @map("photo_url")
+  unitFamily  UnitFamily @map("unit_family")
+  baseUnit    BaseUnit   @map("base_unit")
+  notes       String?
+  isActive    Boolean    @default(true) @map("is_active")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  createdById String     @map("created_by") @db.Uuid
+
+  business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category         ProductCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdBy        User              @relation(fields: [createdById], references: [id])
+  supplierProducts SupplierProduct[]
+
+  @@unique([businessId, sku])
+  @@index([businessId])
+  @@index([businessId, isActive])
+  @@index([businessId, barcode])
+  @@map("products")
+}
+
+/// Data supplier (R01).
+model Supplier {
+  id                String   @id @default(uuid()) @db.Uuid
+  businessId        String   @map("business_id") @db.Uuid
+  supplierName      String   @map("supplier_name")
+  companyName       String?  @map("company_name")
+  contactName       String?  @map("contact_name")
+  /// Salah satu dari phoneNumber/whatsappNumber wajib terisi (R01: "salah
+  /// satu kontak HP/WA"), ditegakkan lewat Zod (service layer) DAN CHECK
+  /// constraint DB (lihat migration.sql) - bukan NOT NULL tunggal karena
+  /// keduanya opsional secara individual.
+  phoneNumber       String?  @map("phone_number")
+  whatsappNumber    String?  @map("whatsapp_number")
+  email             String?
+  address           String
+  province          String
+  city              String
+  district          String?
+  postalCode        String?  @map("postal_code")
+  latitude          Decimal? @map("latitude") @db.Decimal(9, 6)
+  longitude         Decimal? @map("longitude") @db.Decimal(9, 6)
+  mapLocation       String?  @map("map_location")
+  operatingHours    String?  @map("operating_hours")
+  leadTimeDaysMin   Int      @default(0) @map("lead_time_days_min")
+  leadTimeDaysMax   Int      @map("lead_time_days_max")
+  orderCutoffTime   String?  @map("order_cutoff_time")
+  orderCutoffDays   String[] @map("order_cutoff_days")
+  minPurchaseAmount Decimal? @map("min_purchase_amount") @db.Decimal(18, 2)
+  paymentMethod     String?  @map("payment_method")
+  paymentTermDays   Int?     @map("payment_term_days")
+  notes             String?
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  createdById       String   @map("created_by") @db.Uuid
+
+  business          Business                   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy         User                       @relation(fields: [createdById], references: [id])
+  contacts          SupplierContact[]
+  deliveryAreas     SupplierDeliveryArea[]
+  deliverySchedules SupplierDeliverySchedule[]
+  supplierProducts  SupplierProduct[]
+  shippingRule      ShippingRule?
+  purchaseOrders    PurchaseOrder[]
+
+  @@index([businessId])
+  @@index([businessId, isActive])
+  @@index([businessId, city])
+  @@map("suppliers")
+}
+
+/// Kontak tambahan supplier di luar kontak utama (R01).
+model SupplierContact {
+  id             String   @id @default(uuid()) @db.Uuid
+  supplierId     String   @map("supplier_id") @db.Uuid
+  businessId     String   @map("business_id") @db.Uuid
+  contactName    String   @map("contact_name")
+  roleTitle      String?  @map("role_title")
+  phoneNumber    String?  @map("phone_number")
+  whatsappNumber String?  @map("whatsapp_number")
+  email          String?
+  isPrimary      Boolean  @default(false) @map("is_primary")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@map("supplier_contacts")
+}
+
+/// Area pengiriman supplier (R01, dipakai R14 "melayani lokasi pengguna").
+model SupplierDeliveryArea {
+  id         String   @id @default(uuid()) @db.Uuid
+  supplierId String   @map("supplier_id") @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  province   String
+  city       String?
+  district   String?
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([businessId, province, city])
+  @@map("supplier_delivery_areas")
+}
+
+/// Hari pengiriman rutin supplier (R01, R19). 0 = Minggu ... 6 = Sabtu.
+model SupplierDeliverySchedule {
+  id         String   @id @default(uuid()) @db.Uuid
+  supplierId String   @map("supplier_id") @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  dayOfWeek  Int      @map("day_of_week") @db.SmallInt
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, dayOfWeek])
+  @@map("supplier_delivery_schedules")
+}
+
+/// Tarif pajak dapat diatur per bisnis, tidak hardcode (R07). Hanya
+/// Pemilik/Admin yang dapat mengelola (R26, ARCHITECTURE.md §5).
+model TaxRate {
+  id          String   @id @default(uuid()) @db.Uuid
+  businessId  String   @map("business_id") @db.Uuid
+  name        String
+  ratePercent Decimal  @map("rate_percent") @db.Decimal(6, 3)
+  isDefault   Boolean  @default(false) @map("is_default")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String   @map("created_by") @db.Uuid
+
+  business  Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy User            @relation(fields: [createdById], references: [id])
+  prices    SupplierPrice[]
+
+  @@index([businessId, isActive])
+  @@map("tax_rates")
+}
+
+/// Penawaran produk oleh supplier: struktur kemasan & aturan pembelian (R03).
+/// `totalPackageContent` SELALU dihitung ulang di service layer memakai
+/// `resolvePackage()` (Tahap 2), tidak pernah diterima mentah dari klien.
+model SupplierProduct {
+  id                       String          @id @default(uuid()) @db.Uuid
+  businessId               String          @map("business_id") @db.Uuid
+  supplierId               String          @map("supplier_id") @db.Uuid
+  productId                String          @map("product_id") @db.Uuid
+  supplierSkuOrName        String?         @map("supplier_sku_or_name")
+  packageType              PackagingType   @map("package_type")
+  itemsPerPackage          Decimal         @map("items_per_package") @db.Decimal(14, 4)
+  contentPerItem           Decimal         @map("content_per_item") @db.Decimal(14, 4)
+  contentUnit              MeasurementUnit @map("content_unit")
+  totalPackageContent      Decimal         @map("total_package_content") @db.Decimal(14, 4)
+  baseUnit                 BaseUnit        @map("base_unit")
+  minPurchasePackages      Decimal         @default(1) @map("min_purchase_packages") @db.Decimal(14, 4)
+  purchaseMultiplePackages Decimal         @default(1) @map("purchase_multiple_packages") @db.Decimal(14, 4)
+  estimatedDeliveryDaysMin Int?            @map("estimated_delivery_days_min")
+  estimatedDeliveryDaysMax Int?            @map("estimated_delivery_days_max")
+  isActive                 Boolean         @default(true) @map("is_active")
+  createdAt                DateTime        @default(now()) @map("created_at")
+  updatedAt                DateTime        @updatedAt @map("updated_at")
+  createdById              String          @map("created_by") @db.Uuid
+
+  business           Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplier           Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product            Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdBy          User                @relation(fields: [createdById], references: [id])
+  prices             SupplierPrice[]
+  stock              SupplierStock?
+  purchaseOrderItems PurchaseOrderItem[]
+
+  @@unique([supplierId, productId, packageType, supplierSkuOrName])
+  @@index([businessId])
+  @@index([productId])
+  @@index([supplierId])
+  @@index([businessId, productId, isActive])
+  @@map("supplier_products")
+}
+
+/// Riwayat harga APPEND-ONLY (R20). Repository layer tidak pernah
+/// menyediakan UPDATE/DELETE untuk tabel ini - hanya INSERT dan SELECT.
+/// Baris terbaru per `supplierProductId` (berdasar `createdAt`) adalah
+/// harga aktif.
+model SupplierPrice {
+  id                   String    @id @default(uuid()) @db.Uuid
+  businessId           String    @map("business_id") @db.Uuid
+  supplierProductId    String    @map("supplier_product_id") @db.Uuid
+  pricePerPackage      Decimal   @map("price_per_package") @db.Decimal(18, 2)
+  taxStatus            TaxStatus @map("tax_status")
+  taxRateId            String?   @map("tax_rate_id") @db.Uuid
+  taxRateValueSnapshot Decimal?  @map("tax_rate_value_snapshot") @db.Decimal(6, 3)
+  priceSourceNote      String?   @map("price_source_note")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  createdById          String    @map("created_by") @db.Uuid
+
+  business        Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplierProduct SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  taxRate         TaxRate?        @relation(fields: [taxRateId], references: [id], onDelete: SetNull)
+  createdBy       User            @relation(fields: [createdById], references: [id])
+
+  @@index([supplierProductId, createdAt(sort: Desc)])
+  @@map("supplier_prices")
+}
+
+/// Status ketersediaan & stok terkini (mutable) - bukan riwayat wajib, tapi
+/// mencatat `updatedAt` untuk kebutuhan freshness (R09, R12, poin 7).
+model SupplierStock {
+  id                 String             @id @default(uuid()) @db.Uuid
+  businessId         String             @map("business_id") @db.Uuid
+  supplierProductId  String             @unique @map("supplier_product_id") @db.Uuid
+  availabilityStatus AvailabilityStatus @map("availability_status")
+  stockQty           Decimal?           @map("stock_qty") @db.Decimal(14, 4)
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  updatedById        String             @map("updated_by") @db.Uuid
+
+  business        Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplierProduct SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  updatedBy       User            @relation(fields: [updatedById], references: [id])
+
+  @@map("supplier_stock")
+}
+
+/// Aturan ongkir per supplier (R08). Satu supplier memiliki paling banyak
+/// satu aturan aktif (relasi 1:1, disederhanakan dari catatan DATA_MODEL.md
+/// §15 yang membuka opsi multi-aturan dengan prioritas - belum dibutuhkan
+/// pada cakupan Tahap 3).
+model ShippingRule {
+  id                    String       @id @default(uuid()) @db.Uuid
+  businessId            String       @map("business_id") @db.Uuid
+  supplierId            String       @unique @map("supplier_id") @db.Uuid
+  ruleType              ShippingMode @map("rule_type")
+  freeShippingMinAmount Decimal?     @map("free_shipping_min_amount") @db.Decimal(18, 2)
+  flatFee               Decimal?     @map("flat_fee") @db.Decimal(18, 2)
+  notes                 String?
+  isActive              Boolean      @default(true) @map("is_active")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
+  createdById           String       @map("created_by") @db.Uuid
+
+  business  Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplier  Supplier           @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  createdBy User               @relation(fields: [createdById], references: [id])
+  areas     ShippingRuleArea[]
+
+  @@map("shipping_rules")
+}
+
+/// Tarif ongkir berbeda per area untuk mode BERDASARKAN_AREA (R08).
+model ShippingRuleArea {
+  id             String   @id @default(uuid()) @db.Uuid
+  shippingRuleId String   @map("shipping_rule_id") @db.Uuid
+  businessId     String   @map("business_id") @db.Uuid
+  province       String
+  city           String?
+  fee            Decimal  @db.Decimal(18, 2)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  shippingRule ShippingRule @relation(fields: [shippingRuleId], references: [id], onDelete: Cascade)
+  business     Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([shippingRuleId])
+  @@map("shipping_rule_areas")
+}
+
+// ---------------------------------------------------------------------
+// Pesanan (pengembangan lanjutan atas Tahap 5 - disepakati lewat diskusi
+// 2026-08-18, lihat docs/BACKLOG.md #2 dan docs/DATA_MODEL.md §17-18
+// untuk rancangan awal beserta catatan revisinya).
+// ---------------------------------------------------------------------
+
+/// Lokasi/cabang bisnis. Sengaja tabel TERPISAH (bukan field langsung di
+/// `Business`) walau saat ini baru dipakai 1 baris per bisnis (ditandai
+/// `isDefault`), agar bisa menambah cabang lain nanti tanpa migrasi ulang
+/// skema. Dipakai untuk mengisi otomatis alamat tujuan pada halaman
+/// Bandingkan & Pesanan (tidak perlu ketik manual berulang).
+model BusinessLocation {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @map("business_id") @db.Uuid
+  name       String
+  province   String
+  city       String?
+  district   String?
+  address    String?
+  isDefault  Boolean  @default(false) @map("is_default")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  business       Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  purchaseOrders PurchaseOrder[]
+
+  @@index([businessId, isActive])
+  @@map("business_locations")
+}
+
+/// Status pesanan (R16). `DIKONFIRMASI` ditambah dari rencana awal:
+/// menandai pesanan yang isinya sudah dipastikan (berdasarkan balasan
+/// WhatsApp supplier, status per baris di `PurchaseOrderItem`) dan
+/// metode bayarnya sudah dipilih - SEBELUM barang benar-benar diterima
+/// secara fisik (`DITERIMA`, menyusul bersama `goods_receipts` pada
+/// bagian R18 yang belum dikerjakan).
+enum PurchaseOrderStatus {
+  DRAFT
+  DIPESAN
+  DIKONFIRMASI
+  DIKIRIM
+  DITERIMA
+  DIBATALKAN
+}
+
+/// Status ketersediaan per baris produk dalam pesanan. Diisi MANUAL oleh
+/// pengguna setelah membaca balasan supplier di WhatsApp - TIDAK ada
+/// integrasi otomatis ke WhatsApp. `SEBAGIAN` memakai
+/// `PurchaseOrderItem.confirmedPackageQty` untuk mencatat jumlah yang
+/// benar-benar dikonfirmasi tersedia (boleh kurang dari `packageQty`
+/// yang awalnya diminta).
+enum PurchaseOrderItemAvailability {
+  BELUM_DIKONFIRMASI
+  TERSEDIA
+  SEBAGIAN
+  TIDAK_TERSEDIA
+}
+
+/// Metode konfirmasi pembayaran. Pencatatan pilihan saja (tunai/transfer),
+/// BUKAN integrasi payment gateway.
+enum PaymentMethod {
+  TUNAI
+  TRANSFER
+}
+
+/// Pesanan ke SATU supplier, berisi banyak baris produk (R16). Satu
+/// draft = satu supplier (disepakati saat diskusi pengembangan, agar
+/// tidak membingungkan saat mengirim WhatsApp per supplier - lihat
+/// docs/BACKLOG.md #2).
+model PurchaseOrder {
+  id            String              @id @default(uuid()) @db.Uuid
+  businessId    String              @map("business_id") @db.Uuid
+  /// NULL selama status DRAFT; diisi format `PO-YYYY-NNNN` di service
+  /// layer saat pesanan dikirim (transisi ke DIPESAN) - lihat
+  /// purchase-order-repository.ts.
+  orderNumber   String?             @map("order_number")
+  supplierId    String              @map("supplier_id") @db.Uuid
+  locationId    String?             @map("location_id") @db.Uuid
+  status        PurchaseOrderStatus @default(DRAFT)
+  paymentMethod PaymentMethod?      @map("payment_method")
+  notes         String?
+  /// NOT NULL bila status = DIBATALKAN (di-enforce di service layer, R29).
+  cancelReason  String?             @map("cancel_reason")
+  sentAt        DateTime?           @map("sent_at")
+  confirmedAt   DateTime?           @map("confirmed_at")
+  cancelledAt   DateTime?           @map("cancelled_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+  createdById   String              @map("created_by") @db.Uuid
+
+  business  Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplier  Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  location  BusinessLocation?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  createdBy User                @relation(fields: [createdById], references: [id])
+  items     PurchaseOrderItem[]
+
+  @@unique([businessId, orderNumber])
+  @@index([businessId, status])
+  @@index([supplierId])
+  @@map("purchase_orders")
+}
+
+/// Satu baris produk dalam pesanan (R16). Harga/pajak SNAPSHOT dari
+/// `SupplierPrice` aktif saat baris ditambahkan (bukan referensi hidup),
+/// agar riwayat pesanan tidak berubah retroaktif jika harga berubah
+/// nanti (konsisten dengan `supplier_prices`, R20). Pesan WhatsApp
+/// (R17, versi revisi) TIDAK menampilkan harga - field ini murni untuk
+/// catatan/kalkulasi total di sisi aplikasi.
+model PurchaseOrderItem {
+  id                      String                        @id @default(uuid()) @db.Uuid
+  purchaseOrderId         String                        @map("purchase_order_id") @db.Uuid
+  businessId              String                        @map("business_id") @db.Uuid
+  supplierProductId       String                        @map("supplier_product_id") @db.Uuid
+  packageQty              Decimal                       @map("package_qty") @db.Decimal(14, 4)
+  pricePerPackageSnapshot Decimal                       @map("price_per_package_snapshot") @db.Decimal(18, 2)
+  taxStatusSnapshot       TaxStatus                     @map("tax_status_snapshot")
+  taxRateValueSnapshot    Decimal?                      @map("tax_rate_value_snapshot") @db.Decimal(6, 3)
+  lineSubtotal            Decimal                       @map("line_subtotal") @db.Decimal(18, 2)
+  availabilityStatus      PurchaseOrderItemAvailability @default(BELUM_DIKONFIRMASI) @map("availability_status")
+  /// Diisi hanya ketika `availabilityStatus = SEBAGIAN` - jumlah kemasan
+  /// yang benar-benar dikonfirmasi tersedia oleh supplier.
+  confirmedPackageQty     Decimal?                      @map("confirmed_package_qty") @db.Decimal(14, 4)
+  notes                   String?
+  createdAt               DateTime                      @default(now()) @map("created_at")
+  updatedAt               DateTime                      @updatedAt @map("updated_at")
+
+  purchaseOrder   PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  business        Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplierProduct SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+
+  @@unique([purchaseOrderId, supplierProductId])
+  @@index([purchaseOrderId])
+  @@index([supplierProductId])
+  @@map("purchase_order_items")
+}
