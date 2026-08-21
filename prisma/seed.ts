@@ -26,20 +26,25 @@ async function main() {
 
   const business = await prisma.business.upsert({
     where: { id: "00000000-0000-4000-8000-000000000001" },
-    update: {},
+    update: {
+      name: "TOKO ZOYA",
+      ownerName: "Adipati",
+    },
     create: {
       id: "00000000-0000-4000-8000-000000000001",
-      name: "Toko Contoh Sejahtera",
-      ownerName: "Budi Santoso",
+      name: "TOKO ZOYA",
+      ownerName: "Adipati",
       defaultAddress: "Jl. Contoh Makmur No. 1, Jakarta",
     },
   });
 
   const owner = await prisma.user.upsert({
     where: { email: "pemilik@contoh.test" },
-    update: {},
+    update: {
+      name: "Adipati",
+    },
     create: {
-      name: "Budi Santoso",
+      name: "Adipati",
       email: "pemilik@contoh.test",
       passwordHash: demoPasswordHash,
     },
