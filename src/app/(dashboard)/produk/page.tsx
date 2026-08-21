@@ -52,21 +52,30 @@ export default async function ProdukPage() {
         />
       ) : (
         <ProductBrowser
-          products={products.map((product) => ({
-            id: product.id,
-            sku: product.sku,
-            productName: product.productName,
-            brand: product.brand,
-            variant: product.variant,
-            unitFamily: product.unitFamily,
-            photoUrl: product.photoUrl,
-            isActive: product.isActive,
-            offerCount: product._count.supplierProducts,
-            supplierIds: product.supplierProducts.map((offer) => offer.supplierId),
-            category: product.category
-              ? { id: product.category.id, name: product.category.name }
-              : null,
-          }))}
+          products={products.map((product) => {
+            const prices = product.supplierProducts
+              .map((offer) => offer.prices[0]?.pricePerPackage)
+              .filter((price): price is NonNullable<typeof price> => price != null)
+              .map((price) => Number(price));
+            const lowestPrice = prices.length > 0 ? Math.min(...prices) : null;
+
+            return {
+              id: product.id,
+              sku: product.sku,
+              productName: product.productName,
+              brand: product.brand,
+              variant: product.variant,
+              unitFamily: product.unitFamily,
+              photoUrl: product.photoUrl,
+              isActive: product.isActive,
+              offerCount: product._count.supplierProducts,
+              lowestPrice,
+              supplierIds: product.supplierProducts.map((offer) => offer.supplierId),
+              category: product.category
+                ? { id: product.category.id, name: product.category.name }
+                : null,
+            };
+          })}
           categories={categories.map((category) => ({
             id: category.id,
             name: category.name,

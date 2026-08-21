@@ -13,7 +13,8 @@ export type IconName =
   | "mapPin"
   | "camera"
   | "image"
-  | "arrowLeft";
+  | "arrowLeft"
+  | "shoppingCart";
 
 interface NavIconProps extends Omit<SVGProps<SVGSVGElement>, "viewBox" | "fill"> {
   name: IconName;
@@ -135,6 +136,14 @@ export function NavIcon({ name, ...props }: NavIconProps) {
         <svg {...common}>
           <path d="M19 12H5" />
           <path d="m11 18-6-6 6-6" />
+        </svg>
+      );
+    case "shoppingCart":
+      return (
+        <svg {...common}>
+          <circle cx="9" cy="20" r="1.4" />
+          <circle cx="18" cy="20" r="1.4" />
+          <path d="M2.5 3h2l2.2 12.1a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 2-1.6L21 8H6" />
         </svg>
       );
     default:

@@ -37,8 +37,17 @@ export async function listProducts(businessId: string, filters: ProductListFilte
       _count: { select: { supplierProducts: true } },
       // Hanya id supplier dari penawaran AKTIF - dipakai untuk filter
       // "produk dari supplier X" di sisi klien (halaman Produk bergaya
-      // marketplace) tanpa perlu query terpisah per produk.
-      supplierProducts: { where: { isActive: true }, select: { supplierId: true } },
+      // marketplace) tanpa perlu query terpisah per produk. Sekalian ambil
+      // harga TERBARU tiap penawaran (permintaan pengguna 2026-08-21) untuk
+      // ditampilkan sebagai "Mulai Rp..." di kartu produk, pengganti SKU
+      // yang cuma kode internal (tidak berguna buat yang mau belanja).
+      supplierProducts: {
+        where: { isActive: true },
+        select: {
+          supplierId: true,
+          prices: { orderBy: { createdAt: "desc" }, take: 1, select: { pricePerPackage: true } },
+        },
+      },
     },
   });
 }

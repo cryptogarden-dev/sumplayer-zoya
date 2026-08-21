@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { NavIcon } from "@/components/app-shell/NavIcon";
 import { categoryTone } from "@/lib/format/category-color";
+import { formatRupiah } from "@/lib/format/currency";
 import type { UnitFamily } from "@/lib/domain/units/types";
 
 // Kelas Tailwind harus berupa literal statis agar terdeteksi compiler -
@@ -27,6 +28,11 @@ export interface ProductCardData {
   photoUrl: string | null;
   isActive: boolean;
   offerCount: number;
+  /** Harga termurah dari semua penawaran supplier aktif, null kalau belum
+   * ada penawaran/harga sama sekali (permintaan pengguna 2026-08-21:
+   * pengganti tampilan SKU di kartu produk, lebih berguna gaya
+   * marketplace). */
+  lowestPrice: number | null;
   supplierIds: string[];
   category: { id: string; name: string } | null;
 }
@@ -105,7 +111,11 @@ export function ProductCard({
         ) : null}
         <h3 className="line-clamp-2 text-sm font-semibold text-slate-900">{product.productName}</h3>
         {subtitle ? <p className="line-clamp-1 text-xs text-slate-500">{subtitle}</p> : null}
-        <p className="text-xs text-slate-400">SKU: {product.sku}</p>
+        {product.lowestPrice != null ? (
+          <p className="text-sm font-semibold text-slate-900">
+            Mulai {formatRupiah(product.lowestPrice)}
+          </p>
+        ) : null}
 
         <div className="mt-auto flex items-center justify-between pt-2 text-xs">
           <span className="font-medium text-indigo-600">

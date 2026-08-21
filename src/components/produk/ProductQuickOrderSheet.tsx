@@ -51,18 +51,27 @@ export function ProductQuickOrderSheet({
 }) {
   return (
     <BottomSheet open={product !== null} onOpenChange={(open) => !open && onClose()}>
-      {product ? <ProductQuickOrderBody key={product.id} product={product} /> : null}
+      {product ? (
+        <ProductQuickOrderBody key={product.id} product={product} onClose={onClose} />
+      ) : null}
     </BottomSheet>
   );
 }
 
-function ProductQuickOrderBody({ product }: { product: ProductCardData }) {
+function ProductQuickOrderBody({
+  product,
+  onClose,
+}: {
+  product: ProductCardData;
+  onClose: () => void;
+}) {
   const router = useRouter();
   const [offers, setOffers] = useState<OfferRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyOfferId, setBusyOfferId] = useState<string | null>(null);
+  const [addedOfferIds, setAddedOfferIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -143,7 +152,13 @@ function ProductQuickOrderBody({ product }: { product: ProductCardData }) {
         throw new Error(payload?.error ?? "Gagal menambahkan produk ke pesanan.");
       }
 
-      router.push(`/pesanan/${orderId}`);
+      // TIDAK pindah halaman (permintaan pengguna 2026-08-21): supaya bisa
+      // langsung klik produk lain tanpa "muter-muter", bukan dilempar ke
+      // halaman Pesanan tiap kali menambah 1 barang. Halaman Pesanan jadi
+      // langkah konfirmasi/kirim terpisah, diakses lewat ikon keranjang.
+      setAddedOfferIds((current) => new Set(current).add(offer.id));
+      setBusyOfferId(null);
+      router.refresh(); // supaya badge keranjang di header ikut ter-update
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : "Terjadi kesalahan. Coba lagi.");
       setBusyOfferId(null);
@@ -281,13 +296,19 @@ function ProductQuickOrderBody({ product }: { product: ProductCardData }) {
                       +
                     </button>
                   </div>
-                  <Button
-                    className="min-h-9 px-3 text-xs"
-                    disabled={busyOfferId !== null}
-                    onClick={() => handleQuickOrder(offer)}
-                  >
-                    {busyOfferId === offer.id ? "..." : "Pesan"}
-                  </Button>
+                  {addedOfferIds.has(offer.id) ? (
+                    <span className="min-h-9 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                      Ditambahkan
+                    </span>
+                  ) : (
+                    <Button
+                      className="min-h-9 px-3 text-xs"
+                      disabled={busyOfferId !== null}
+                      onClick={() => handleQuickOrder(offer)}
+                    >
+                      {busyOfferId === offer.id ? "..." : "Pesan"}
+                    </Button>
+                  )}
                 </div>
               </li>
             ))}
@@ -299,6 +320,12 @@ function ProductQuickOrderBody({ product }: { product: ProductCardData }) {
         <p className="text-sm font-medium text-red-600" role="alert">
           {actionError}
         </p>
+      ) : null}
+
+      {addedOfferIds.size > 0 ? (
+        <Button className="w-full" variant="secondary" onClick={onClose}>
+          Selesai, Pilih Produk Lain
+        </Button>
       ) : null}
 
       <div className="border-t border-slate-100 pt-3 text-center">

@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { BackLink } from "@/components/ui/BackLink";
 import { SupplierEditForm } from "@/components/supplier/SupplierEditForm";
 import { SupplierStatusButton } from "@/components/supplier/SupplierStatusButton";
+import { SupplierDeleteButton } from "@/components/supplier/SupplierDeleteButton";
 import { CreateOrderButton } from "@/components/supplier/CreateOrderButton";
 
 export const metadata: Metadata = { title: "Detail Supplier" };
@@ -65,7 +66,14 @@ export default async function SupplierDetailPage({ params }: SupplierDetailPageP
           }}
         />
 
-        <SupplierStatusButton supplierId={supplier.id} isActive={supplier.isActive} />
+        <div className="flex flex-wrap items-center gap-3">
+          <SupplierStatusButton supplierId={supplier.id} isActive={supplier.isActive} />
+          <SupplierDeleteButton supplierId={supplier.id} />
+        </div>
+        <p className="-mt-4 text-xs text-slate-500">
+          Nonaktifkan bisa diaktifkan lagi sewaktu-waktu. Hapus permanen hanya bisa dilakukan untuk
+          supplier yang belum pernah dipesan.
+        </p>
 
         <div>
           <h2 className="mb-3 text-base font-semibold text-slate-900">Pesanan</h2>

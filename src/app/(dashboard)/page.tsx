@@ -22,7 +22,7 @@ export default async function BerandaPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           label="Jumlah Supplier"
           value={summary.supplierCount}
@@ -38,14 +38,7 @@ export default async function BerandaPage() {
           value={summary.activeOrderCount}
           description="Belum diterima/dibatalkan"
         />
-        <StatCard label="Pengingat" value={summary.reminderCount} description="Menunggu tindakan" />
       </div>
-
-      <p className="mt-6 text-xs text-slate-400">
-        Ringkasan di atas akan otomatis terisi data nyata setelah modul Supplier, Produk, dan
-        Pesanan dibangun (lihat docs/IMPLEMENTATION_PLAN.md Tahap 3–5). Nilai nol di atas bukan data
-        tiruan — modul terkait memang belum tersedia.
-      </p>
     </div>
   );
 }

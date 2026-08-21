@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { DeletionBlockedError } from "@/lib/domain";
 import type { SupplierContactInput, SupplierInput } from "@/lib/validation/supplier";
 import type { ShippingRuleInput } from "@/lib/validation/shipping-rule";
 import type { Prisma } from "@generated/prisma/client";
@@ -142,6 +143,32 @@ export async function setSupplierActive(businessId: string, id: string, isActive
     data: { isActive },
   });
   return result.count > 0;
+}
+
+/**
+ * Hapus PERMANEN satu supplier (docs/BACKLOG.md #5, pola sama seperti
+ * `deleteProduct`). Skema memakai `onDelete: Cascade` dari Supplier ->
+ * SupplierProduct -> PurchaseOrderItem DAN Supplier -> PurchaseOrder
+ * langsung, jadi hapus permanen supplier bisa merusak riwayat pesanan lama
+ * kalau tidak dijaga - ditolak dengan `DeletionBlockedError` jika supplier
+ * ini pernah dipakai di baris pesanan manapun. Gunakan `setSupplierActive`
+ * (nonaktifkan) untuk kasus itu.
+ */
+export async function deleteSupplier(businessId: string, id: string): Promise<boolean> {
+  const supplier = await prisma.supplier.findFirst({ where: { id, businessId } });
+  if (!supplier) return false;
+
+  const orderHistoryCount = await prisma.purchaseOrderItem.count({
+    where: { businessId, supplierProduct: { supplierId: id } },
+  });
+  if (orderHistoryCount > 0) {
+    throw new DeletionBlockedError(
+      "Supplier ini sudah pernah dipesan, jadi tidak bisa dihapus permanen (supaya riwayat pesanan lama tidak rusak). Gunakan tombol Nonaktifkan.",
+    );
+  }
+
+  await prisma.supplier.delete({ where: { id } });
+  return true;
 }
 
 export async function listSupplierContacts(businessId: string, supplierId: string) {

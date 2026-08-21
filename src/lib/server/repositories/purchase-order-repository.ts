@@ -43,6 +43,18 @@ export interface PurchaseOrderListFilters {
   supplierId?: string;
 }
 
+/**
+ * Jumlah baris produk di semua pesanan berstatus DRAFT (belum dikirim ke
+ * supplier manapun) - dipakai sebagai badge "keranjang" di header (poin 3
+ * permintaan pengguna 2026-08-21: bisa pilih produk berkali-kali tanpa
+ * pindah halaman, lalu konfirmasi/kirim semuanya dari halaman Pesanan).
+ */
+export async function countDraftOrderItems(businessId: string): Promise<number> {
+  return prisma.purchaseOrderItem.count({
+    where: { businessId, purchaseOrder: { status: "DRAFT" } },
+  });
+}
+
 export async function listPurchaseOrders(
   businessId: string,
   filters: PurchaseOrderListFilters = {},
