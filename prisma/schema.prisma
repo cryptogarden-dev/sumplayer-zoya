@@ -64,6 +64,7 @@ model Business {
   purchaseOrders            PurchaseOrder[]
   purchaseOrderItems        PurchaseOrderItem[]
   goodsReceipts             GoodsReceipt[]
+  goodsReceiptItems         GoodsReceiptItem[]
   supplierPerformances      SupplierPerformance[]
 
   @@map("businesses")
