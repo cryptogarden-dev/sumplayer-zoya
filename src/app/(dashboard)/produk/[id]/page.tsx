@@ -7,6 +7,9 @@ import {
 import { listSuppliers } from "@/lib/server/repositories/supplier-repository";
 import { listTaxRates } from "@/lib/server/repositories/tax-rate-repository";
 import { listOffers } from "@/lib/server/repositories/supplier-product-repository";
+import { listPurchasePriceHistory } from "@/lib/server/repositories/price-history-repository";
+import { computeCheapestBuyPricePerBaseUnit, computeMargin } from "@/lib/domain/pricing/margin";
+import { PriceHistoryTable } from "@/components/produk/PriceHistoryTable";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Card } from "@/components/ui/Card";
@@ -53,11 +56,31 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     );
   }
 
-  const [suppliers, taxRates, offers] = await Promise.all([
+  const [suppliers, taxRates, offers, priceHistory] = await Promise.all([
     listSuppliers(session.user.businessId),
     listTaxRates(session.user.businessId),
     listOffers(session.user.businessId, { productId: product.id, includeInactive: true }),
+    listPurchasePriceHistory(session.user.businessId, product.id),
   ]);
+
+  // Harga beli termurah per satuan dasar (setelah pajak) dari penawaran
+  // aktif — dipakai untuk margin. Bila tidak ada, margin tidak tampil.
+  const cheapestBuy = computeCheapestBuyPricePerBaseUnit(
+    offers
+      .filter((offer) => offer.isActive && offer.prices[0])
+      .map((offer) => ({
+        pricePerPackage: offer.prices[0]!.pricePerPackage,
+        taxStatus: offer.prices[0]!.taxStatus,
+        taxRatePercent: offer.prices[0]!.taxRateValueSnapshot ?? 0,
+        totalPackageContent: offer.totalPackageContent,
+        supplierName: offer.supplier.supplierName,
+      })),
+  );
+  const margin = computeMargin({
+    sellPricePerBaseUnit: product.sellPricePerBaseUnit,
+    buyPricePerBaseUnit: cheapestBuy?.pricePerBaseUnit,
+  });
+  const marginPercentFormatter = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
 
   return (
     <div>
@@ -86,6 +109,44 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           </p>
         </Card>
 
+        <Card>
+          <p className="text-sm text-slate-600">
+            Harga jual:{" "}
+            <span className="font-semibold text-slate-900">
+              {product.sellPricePerBaseUnit !== null
+                ? `${formatRupiah(Number(product.sellPricePerBaseUnit))}/${BASE_UNIT_LABELS[product.baseUnit]}`
+                : "— (belum diatur)"}
+            </span>
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            Harga beli termurah:{" "}
+            <span className="font-semibold text-slate-900">
+              {cheapestBuy
+                ? `${formatRupiah(Number(cheapestBuy.pricePerBaseUnit))}/${BASE_UNIT_LABELS[product.baseUnit]} (${cheapestBuy.supplierName})`
+                : "— (belum ada penawaran)"}
+            </span>
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            Margin:{" "}
+            {margin ? (
+              <span
+                className={
+                  margin.amount.isNegative()
+                    ? "font-semibold text-red-600"
+                    : "font-semibold text-emerald-600"
+                }
+              >
+                {formatRupiah(margin.amount.toNumber())}/{BASE_UNIT_LABELS[product.baseUnit]}
+                {margin.percent !== null
+                  ? ` (${marginPercentFormatter.format(margin.percent.toNumber())}%)`
+                  : ""}
+              </span>
+            ) : (
+              <span className="text-slate-500">— (atur harga jual dulu)</span>
+            )}
+          </p>
+        </Card>
+
         <ProductEditForm
           product={{
             id: product.id,
@@ -100,6 +161,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             notes: product.notes,
             stockQty: product.stockQty.toString(),
             lowStockThreshold: product.lowStockThreshold?.toString() ?? null,
+            sellPricePerBaseUnit: product.sellPricePerBaseUnit?.toString() ?? null,
           }}
           categories={categories.map((category) => ({ id: category.id, name: category.name }))}
         />
@@ -162,6 +224,44 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 );
               })}
             </div>
+          )}
+        </div>
+
+        <div>
+          <h2 className="mb-3 text-base font-semibold text-slate-900">
+            Riwayat Harga Beli ({priceHistory.length})
+          </h2>
+          {priceHistory.length === 0 ? (
+            <EmptyState
+              title="Belum ada riwayat harga"
+              description="Harga penawaran yang diubah dan harga pembelian dari pesanan yang sudah dikonfirmasi akan tercatat di sini."
+            />
+          ) : (
+            <PriceHistoryTable
+              rows={priceHistory.map((row) => ({
+                id: row.id,
+                date: row.date.toISOString(),
+                source: row.source,
+                supplierName: row.supplierName,
+                orderNumber: row.orderNumber,
+                packageType: row.packageType,
+                itemsPerPackage: row.itemsPerPackage.toString(),
+                contentPerItem: row.contentPerItem.toString(),
+                contentUnit: row.contentUnit,
+                totalPackageContent: row.totalPackageContent.toString(),
+                baseUnit: row.baseUnit,
+                taxStatus: row.taxStatus,
+                pricePerPackage: row.pricePerPackage.toString(),
+                pricePerBaseUnit: row.pricePerBaseUnit.toString(),
+                change: row.change
+                  ? {
+                      amountChange: row.change.amountChange.toString(),
+                      percentChange: row.change.percentChange?.toString() ?? null,
+                      direction: row.change.direction,
+                    }
+                  : null,
+              }))}
+            />
           )}
         </div>
 

@@ -34,6 +34,13 @@ export const productInputSchema = z.object({
     .nonnegative("Ambang stok menipis tidak boleh negatif")
     .nullable()
     .optional(),
+  /** Harga jual per satuan dasar produk (perbaikan #5). `null` = belum
+   * diatur — margin tidak ditampilkan. */
+  sellPricePerBaseUnit: z
+    .number()
+    .nonnegative("Harga jual tidak boleh negatif")
+    .nullable()
+    .optional(),
 });
 
 export type ProductInput = z.infer<typeof productInputSchema>;

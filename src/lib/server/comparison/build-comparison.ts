@@ -512,8 +512,12 @@ export async function buildComparison(input: BuildComparisonInput): Promise<Comp
     estimatedArrivalMax: ctx.delivery.estimatedArrivalMax,
     proximityScore: ctx.proximity.score,
     availabilityStatus: ctx.offer.stock?.availabilityStatus ?? "PERLU_KONFIRMASI",
-    needsConfirmation:
-      eligibilities[index]!.cautionNotes.length > 0 || ctx.shipping.requiresConfirmation,
+    // Perbaikan #5: chip "Perlu Konfirmasi" hanya soal ongkir yang belum
+    // diketahui (total final null). Catatan kehati-hatian lain (harga
+    // kedaluwarsa, stok belum pasti) tetap tampil lewat `reasonText` dan
+    // memengaruhi `eligible` — tapi bukan lewat chip ini, supaya chipnya
+    // tidak menyesatkan saat ongkir sudah ada aturannya.
+    needsConfirmation: ctx.shipping.requiresConfirmation,
     eligible: eligibilities[index]!.eligible,
     score: scoreById.get(ctx.offer.id) ?? 0,
   }));
@@ -524,8 +528,9 @@ export async function buildComparison(input: BuildComparisonInput): Promise<Comp
     const eligibility = eligibilities[index]!;
     const labels = labelsById.get(offer.id) ?? [];
     const isRecommended = labels.includes(LABEL.RECOMMENDED);
-    const needsConfirmation =
-      eligibility.cautionNotes.length > 0 || ctx.shipping.requiresConfirmation;
+    // Sama seperti di atas (perbaikan #5): chip hanya bila ongkir belum
+    // diketahui, bukan bila ada catatan kehati-hatian lain.
+    const needsConfirmation = ctx.shipping.requiresConfirmation;
 
     const reasonText = buildRecommendationReason({
       eligible: eligibility.eligible,

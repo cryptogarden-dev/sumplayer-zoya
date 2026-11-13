@@ -45,7 +45,18 @@ export async function listProducts(businessId: string, filters: ProductListFilte
         where: { isActive: true },
         select: {
           supplierId: true,
-          prices: { orderBy: { createdAt: "desc" }, take: 1, select: { pricePerPackage: true } },
+          // Isi kemasan + status pajak dipakai untuk menghitung harga beli
+          // termurah PER SATUAN DASAR di kartu produk (perbaikan #5).
+          totalPackageContent: true,
+          prices: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: {
+              pricePerPackage: true,
+              taxStatus: true,
+              taxRateValueSnapshot: true,
+            },
+          },
         },
       },
     },
@@ -99,6 +110,7 @@ export async function createProduct(businessId: string, userId: string, input: P
       unitFamily: input.unitFamily,
       baseUnit: resolveBaseUnit(input),
       notes: input.notes ?? null,
+      sellPricePerBaseUnit: input.sellPricePerBaseUnit ?? null,
       createdById: userId,
     },
   });
@@ -123,6 +135,10 @@ export async function updateProduct(businessId: string, id: string, input: Produ
       ...(input.stockQty !== undefined ? { stockQty: input.stockQty } : {}),
       ...(input.lowStockThreshold !== undefined
         ? { lowStockThreshold: input.lowStockThreshold }
+        : {}),
+      // Harga jual: pola yang sama — hanya diubah bila klien mengirimnya.
+      ...(input.sellPricePerBaseUnit !== undefined
+        ? { sellPricePerBaseUnit: input.sellPricePerBaseUnit }
         : {}),
     },
   });

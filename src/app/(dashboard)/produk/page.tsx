@@ -9,6 +9,7 @@ import { listSuppliers } from "@/lib/server/repositories/supplier-repository";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProductBrowser } from "@/components/produk/ProductBrowser";
+import { computeCheapestBuyPricePerBaseUnit, computeMargin } from "@/lib/domain/pricing/margin";
 
 export const metadata: Metadata = { title: "Produk" };
 export const dynamic = "force-dynamic";
@@ -58,6 +59,23 @@ export default async function ProdukPage() {
               .filter((price): price is NonNullable<typeof price> => price != null)
               .map((price) => Number(price));
             const lowestPrice = prices.length > 0 ? Math.min(...prices) : null;
+            // Harga beli termurah per satuan dasar + margin vs harga jual
+            // (perbaikan #5) — dihitung dari penawaran aktif yang sama.
+            const cheapestBuy = computeCheapestBuyPricePerBaseUnit(
+              product.supplierProducts
+                .filter((offer) => offer.prices[0])
+                .map((offer) => ({
+                  pricePerPackage: offer.prices[0]!.pricePerPackage,
+                  taxStatus: offer.prices[0]!.taxStatus,
+                  taxRatePercent: offer.prices[0]!.taxRateValueSnapshot ?? 0,
+                  totalPackageContent: offer.totalPackageContent,
+                  supplierName: "",
+                })),
+            );
+            const margin = computeMargin({
+              sellPricePerBaseUnit: product.sellPricePerBaseUnit,
+              buyPricePerBaseUnit: cheapestBuy?.pricePerBaseUnit,
+            });
 
             return {
               id: product.id,
@@ -74,6 +92,9 @@ export default async function ProdukPage() {
               stockQty: product.stockQty.toString(),
               lowStockThreshold: product.lowStockThreshold?.toString() ?? null,
               baseUnit: product.baseUnit,
+              sellPricePerBaseUnit: product.sellPricePerBaseUnit?.toString() ?? null,
+              cheapestBuyPerBaseUnit: cheapestBuy?.pricePerBaseUnit.toNumber() ?? null,
+              marginPercent: margin?.percent?.toNumber() ?? null,
               category: product.category
                 ? { id: product.category.id, name: product.category.name }
                 : null,

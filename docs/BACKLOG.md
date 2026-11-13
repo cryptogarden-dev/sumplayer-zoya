@@ -418,6 +418,35 @@ laporan produk yang "dihapus" masih muncul di sisi supplier.
     kelipatan=1, tanpa pajak) jadi kebanyakan pengguna tidak perlu
     membukanya.
 
+**Harga jual + margin + riwayat harga beli (2026-11-13, perbaikan #5):**
+
+- `Product.sellPricePerBaseUnit` (nullable, migrasi
+  `20261113094200_harga_jual_margin`) — harga jual per satuan dasar,
+  diisi di form edit produk; `null` = belum diatur, margin tidak
+  ditampilkan (bukan 0). Domain `src/lib/domain/pricing/margin.ts`:
+  `computeCheapestBuyPricePerBaseUnit` (harga penawaran aktif termurah
+  per satuan dasar setelah pajak, memakai `calculateSubtotal` +
+  `calculatePricePerBaseUnit` yang sudah ada) dan `computeMargin`
+  (jual − beli dan persennya; `null` bila salah satu belum ada, persen
+  `null` bila harga beli 0). Ditampilkan di kartu produk dan detail
+  produk (harga jual, harga beli termurah + nama suppliernya, margin Rp
+  dan %; margin negatif tampil apa adanya).
+- Riwayat harga beli di detail produk (`price-history-repository.ts`):
+  gabungan `supplier_prices` (append-only, R20 — setiap ubah harga
+  menambah baris) dan harga aktual yang dibayar dari
+  `purchase_order_items.price_per_package_snapshot` pada pesanan
+  Dikonfirmasi/Dikirim/Diterima. Harga per satuan dasar setelah pajak;
+  perubahan vs entri sebelumnya dari penawaran yang sama
+  (`calculatePriceChange` yang sudah ada), baris pertama tiap penawaran
+  tanpa pembanding. Tabel kosong menampilkan "Belum ada riwayat harga",
+  bukan data contoh.
+- Chip "Perlu Konfirmasi" di Bandingkan kini hanya muncul bila ongkir
+  memang belum diketahui (`shipping.requiresConfirmation`, total final
+  null) — sebelumnya ikut muncul bila ada catatan kehati-hatian lain
+  (mis. harga kedaluwarsa), padahal total final sudah terhitung dari
+  aturan ongkir. Catatan itu tetap tampil lewat `reasonText` dan tetap
+  memengaruhi `eligible`.
+
 **Perbaikan tambahan (2026-08-21, sesi lanjutan hari yang sama):**
 
 Saat dicoba langsung, pengguna menemukan kasus produk "hitungan" (mis.

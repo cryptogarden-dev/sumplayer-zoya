@@ -25,6 +25,8 @@ export * from "@/lib/domain/pricing/shipping";
 export * from "@/lib/domain/pricing/subtotal";
 export * from "@/lib/domain/pricing/order-total";
 export * from "@/lib/domain/pricing/price-change";
+export * from "@/lib/domain/pricing/price-history";
+export * from "@/lib/domain/pricing/margin";
 export * from "@/lib/domain/pricing/shipping-area";
 
 export * from "@/lib/domain/freshness/data-freshness";

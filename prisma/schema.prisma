@@ -232,6 +232,9 @@ model Product {
   /// peringatan untuk produk ini. Produk aktif dengan stockQty <= ambang
   /// tampil di kartu "Stok menipis" di Beranda.
   lowStockThreshold  Decimal? @map("low_stock_threshold") @db.Decimal(14, 4)
+  /// Harga jual per satuan dasar produk (perbaikan #5, 2026-11-13).
+  /// NULL = belum diatur — margin tidak ditampilkan (bukan 0).
+  sellPricePerBaseUnit Decimal? @map("sell_price_per_base_unit") @db.Decimal(18, 2)
   notes       String?
   isActive    Boolean    @default(true) @map("is_active")
   createdAt   DateTime   @default(now()) @map("created_at")

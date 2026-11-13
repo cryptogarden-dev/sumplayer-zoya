@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/Label";
 import { Select } from "@/components/ui/Select";
 import { UNIT_FAMILIES } from "@/lib/domain/units/types";
 import type { UnitFamily } from "@/lib/domain/units/types";
-import { UNIT_FAMILY_LABELS } from "@/lib/format/units";
+import { BASE_UNIT_BY_FAMILY } from "@/lib/domain/units/constants";
+import { BASE_UNIT_LABELS, UNIT_FAMILY_LABELS } from "@/lib/format/units";
 import { CategoryPicker, type ProductCategoryOption } from "@/components/produk/CategoryPicker";
 import { PhotoUploader } from "@/components/produk/PhotoUploader";
 
@@ -23,6 +24,7 @@ interface ProductFieldErrors {
   unitFamily?: string[];
   stockQty?: string[];
   lowStockThreshold?: string[];
+  sellPricePerBaseUnit?: string[];
 }
 
 /**
@@ -45,6 +47,8 @@ export interface ProductEditFormData {
   stockQty: string;
   /** Ambang peringatan stok menipis, null bila tidak diatur. */
   lowStockThreshold: string | null;
+  /** Harga jual per satuan dasar, null bila belum diatur. */
+  sellPricePerBaseUnit: string | null;
 }
 
 export function ProductEditForm({
@@ -65,6 +69,7 @@ export function ProductEditForm({
   const [unitFamily, setUnitFamily] = useState<UnitFamily>(product.unitFamily);
   const [stockQty, setStockQty] = useState(product.stockQty);
   const [lowStockThreshold, setLowStockThreshold] = useState(product.lowStockThreshold ?? "");
+  const [sellPrice, setSellPrice] = useState(product.sellPricePerBaseUnit ?? "");
   const [fieldErrors, setFieldErrors] = useState<ProductFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -90,6 +95,7 @@ export function ProductEditForm({
         unitFamily,
         stockQty: Number(stockQty),
         lowStockThreshold: lowStockThreshold.trim() === "" ? null : Number(lowStockThreshold),
+        sellPricePerBaseUnit: sellPrice.trim() === "" ? null : Number(sellPrice),
         // TIDAK ditampilkan di form sederhana ini, tetapi dikirim apa
         // adanya (nilai lama) agar tidak tertimpa kosong saat menyimpan
         // (PATCH membutuhkan seluruh field, bukan partial).
@@ -214,6 +220,28 @@ export function ProductEditForm({
             </p>
           )}
         </div>
+      </div>
+
+      <div>
+        <Label htmlFor="sellPricePerBaseUnit">
+          Harga jual (per {BASE_UNIT_LABELS[BASE_UNIT_BY_FAMILY[unitFamily]]})
+        </Label>
+        <Input
+          id="sellPricePerBaseUnit"
+          type="number"
+          min="0"
+          step="any"
+          placeholder="Opsional"
+          value={sellPrice}
+          onChange={(event) => setSellPrice(event.target.value)}
+        />
+        {fieldErrors.sellPricePerBaseUnit ? (
+          <p className="mt-1 text-xs text-red-600">{fieldErrors.sellPricePerBaseUnit[0]}</p>
+        ) : (
+          <p className="mt-1 text-xs text-slate-400">
+            Dipakai menghitung margin vs harga beli termurah. Kosongkan bila belum ditentukan.
+          </p>
+        )}
       </div>
 
       <div>

@@ -41,6 +41,13 @@ export interface ProductCardData {
   /** Ambang peringatan stok menipis, null bila tidak diatur. */
   lowStockThreshold: string | null;
   baseUnit: BaseUnit;
+  /** Harga jual per satuan dasar (string Decimal), null bila belum diatur. */
+  sellPricePerBaseUnit: string | null;
+  /** Harga beli termurah per satuan dasar (setelah pajak), null bila belum
+   * ada penawaran. */
+  cheapestBuyPerBaseUnit: number | null;
+  /** Persen margin vs harga beli termurah, null bila tidak bisa dihitung. */
+  marginPercent: number | null;
 }
 
 /**
@@ -123,6 +130,28 @@ export function ProductCard({
         {product.lowestPrice != null ? (
           <p className="text-sm font-semibold text-slate-900">
             Mulai {formatRupiah(product.lowestPrice)}
+          </p>
+        ) : null}
+        {product.sellPricePerBaseUnit != null ? (
+          <p className="text-sm text-slate-600">
+            Jual {formatRupiah(Number(product.sellPricePerBaseUnit))}/
+            {BASE_UNIT_LABELS[product.baseUnit]}
+            {product.marginPercent != null ? (
+              <span
+                className={
+                  product.marginPercent < 0
+                    ? "font-medium text-red-600"
+                    : "font-medium text-emerald-600"
+                }
+              >
+                {" "}
+                · Margin{" "}
+                {new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(
+                  product.marginPercent,
+                )}
+                %
+              </span>
+            ) : null}
           </p>
         ) : null}
         <p className="text-xs text-slate-500">
