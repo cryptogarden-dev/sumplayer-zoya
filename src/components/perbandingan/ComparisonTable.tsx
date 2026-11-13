@@ -118,14 +118,22 @@ export function ComparisonTable({
                 </td>
                 <td className="px-3 py-2 align-top">
                   {row.money.finalPricePerBaseUnit === null ? (
-                    <span className="text-amber-700">Perlu konfirmasi</span>
+                    <>
+                      {formatRupiah(row.price.pricePerBaseUnitAfterTax)}
+                      <br />
+                      <span className="text-xs text-amber-700">+ ongkir</span>
+                    </>
                   ) : (
                     formatRupiah(row.money.finalPricePerBaseUnit)
                   )}
                 </td>
                 <td className="px-3 py-2 align-top">
                   {row.money.totalCost === null ? (
-                    <span className="text-amber-700">Perlu konfirmasi</span>
+                    <>
+                      {formatRupiah(row.money.subtotalAfterTax)}
+                      <br />
+                      <span className="text-xs text-amber-700">belum termasuk ongkir</span>
+                    </>
                   ) : (
                     formatRupiah(row.money.totalCost)
                   )}
@@ -143,7 +151,13 @@ export function ComparisonTable({
                 <td className="px-3 py-2 align-top">{row.reliability.message}</td>
                 <td className="px-3 py-2 align-top font-semibold">
                   {row.money.totalCost === null ? (
-                    <span className="text-amber-700">Perlu konfirmasi</span>
+                    <>
+                      {formatRupiah(row.money.subtotalAfterTax)}
+                      <br />
+                      <span className="text-xs font-normal text-amber-700">
+                        belum termasuk ongkir
+                      </span>
+                    </>
                   ) : (
                     formatRupiah(row.money.totalCost)
                   )}

@@ -21,6 +21,8 @@ export interface WhatsAppOrderMessageInput {
   baseUnitLabel: string;
   /** Total biaya (subtotal + ongkir). `null` = ongkir belum diketahui — TIDAK ditampilkan seolah nol. */
   totalCost: Decimal.Value | null;
+  /** Total produk sebelum ongkir (= subtotal). Ditampilkan bila totalCost null, dengan keterangan belum termasuk ongkir. */
+  totalCostBeforeShipping?: Decimal.Value | null;
   neededByDate: Date;
   notes?: string;
 }
@@ -40,7 +42,13 @@ export function formatWhatsAppOrderMessage(input: WhatsAppOrderMessageInput): st
     `  ${packages.toString()} ${input.packageTypeLabel} (± ${actual.toString()} ${input.baseUnitLabel})`,
     "",
     `Kebutuhan sebelum: ${formatTanggalIndonesia(input.neededByDate)}`,
-    `Estimasi total: ${input.totalCost === null ? "menunggu konfirmasi ongkir" : formatRupiah(input.totalCost.toString())}`,
+    `Estimasi total: ${
+      input.totalCost === null
+        ? input.totalCostBeforeShipping == null
+          ? "menunggu konfirmasi ongkir"
+          : `${formatRupiah(input.totalCostBeforeShipping.toString())} (belum termasuk ongkir, menunggu konfirmasi ongkir)`
+        : formatRupiah(input.totalCost.toString())
+    }`,
   ];
 
   if (input.notes) {

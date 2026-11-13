@@ -75,6 +75,10 @@ export interface ComparisonRowDto {
     requiresShippingConfirmation: boolean;
     totalCost: string | null;
     finalPricePerBaseUnit: string | null;
+    /** Total produk sebelum ongkir (= subtotal). Selalu ada; bukan total akhir bila ongkir belum diketahui. */
+    totalCostBeforeShipping: string;
+    /** Harga/satuan dasar sebelum ongkir. Selalu ada; bukan harga akhir bila ongkir belum diketahui. */
+    finalPricePerBaseUnitBeforeShipping: string;
   };
   delivery: {
     leadTimeDaysMin: number;

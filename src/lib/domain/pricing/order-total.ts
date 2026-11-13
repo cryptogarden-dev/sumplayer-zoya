@@ -13,6 +13,13 @@ import type { ShippingResult } from "@/lib/domain/pricing/shipping";
  * Jika ongkir belum diketahui (mode PERLU_KONFIRMASI -> `shipping.fee ===
  * null`), maka `totalCost` dan `finalPricePerBaseUnit` JUGA `null` — tidak
  * boleh diam-diam dianggap nol (kasus uji #18).
+ *
+ * Supaya harga yang SUDAH diketahui tidak ikut hilang (bug Bandingkan:
+ * semua kolom harga jadi "Perlu konfirmasi" padahal harga produk sudah
+ * ada), hasil ini juga selalu membawa `totalCostBeforeShipping` (= subtotal
+ * setelah pajak) dan `finalPricePerBaseUnitBeforeShipping` (= subtotal /
+ * jumlah aktual). Keduanya BUKAN total akhir — ongkir belum termasuk —
+ * dan UI wajib menandainya begitu ("belum termasuk ongkir").
  */
 export interface OrderTotalInput {
   subtotalAfterTax: Decimal.Value;
@@ -28,6 +35,10 @@ export interface OrderTotalResult {
   totalCost: Money | null;
   /** Harga akhir per satuan dasar setelah ongkir. `null` jika totalCost belum diketahui. */
   finalPricePerBaseUnit: Money | null;
+  /** Total produk sebelum ongkir (= subtotal setelah pajak). Selalu ada, bukan total akhir. */
+  totalCostBeforeShipping: Money;
+  /** Harga per satuan dasar sebelum ongkir (= subtotal / jumlah aktual). Selalu ada. */
+  finalPricePerBaseUnitBeforeShipping: Money;
   requiresShippingConfirmation: boolean;
 }
 
@@ -44,6 +55,8 @@ export function calculateOrderTotal(input: OrderTotalInput): OrderTotalResult {
     shippingFee,
     totalCost,
     finalPricePerBaseUnit,
+    totalCostBeforeShipping: subtotal,
+    finalPricePerBaseUnitBeforeShipping: subtotal.div(quantity),
     requiresShippingConfirmation: input.shipping.requiresConfirmation,
   };
 }

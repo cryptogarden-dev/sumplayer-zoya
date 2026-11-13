@@ -40,6 +40,22 @@ describe("calculateOrderTotal", () => {
     expect(result.totalCost).toBeNull();
     expect(result.finalPricePerBaseUnit).toBeNull();
     expect(result.requiresShippingConfirmation).toBe(true);
+    // Harga produknya sendiri tetap tersedia (bukan nol, bukan null):
+    // total sebelum ongkir = subtotal, harga/satuan sebelum ongkir = 240.000 / 24 kg.
+    expect(result.totalCostBeforeShipping.toNumber()).toBe(240_000);
+    expect(result.finalPricePerBaseUnitBeforeShipping.toNumber()).toBe(10_000);
+  });
+
+  it("total & harga/satuan sebelum ongkir selalu sama dengan subtotal saat ongkir diketahui", () => {
+    const shipping = calculateShipping({ mode: "TETAP", subtotal: 375_000, flatFee: 25_000 });
+    const result = calculateOrderTotal({
+      subtotalAfterTax: 375_000,
+      shipping,
+      actualQuantityInBaseUnit: 25,
+    });
+
+    expect(result.totalCostBeforeShipping.toNumber()).toBe(375_000);
+    expect(result.finalPricePerBaseUnitBeforeShipping.toNumber()).toBe(15_000);
   });
 
   it("menolak jumlah aktual nol atau negatif", () => {

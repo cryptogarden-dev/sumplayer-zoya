@@ -23,14 +23,6 @@ interface ComparisonCardsProps {
   onSelect: (offerId: string) => void;
 }
 
-function MoneyOrConfirm({ value }: { value: string | null }) {
-  return value === null ? (
-    <span className="text-amber-700">Perlu konfirmasi</span>
-  ) : (
-    <>{formatRupiah(value)}</>
-  );
-}
-
 export function ComparisonCards({
   rows,
   productName,
@@ -66,13 +58,31 @@ export function ComparisonCards({
               <div>
                 <p className="text-slate-500">Harga akhir/satuan</p>
                 <p className="text-lg font-bold text-slate-900">
-                  <MoneyOrConfirm value={row.money.finalPricePerBaseUnit} />
+                  {row.money.finalPricePerBaseUnit === null ? (
+                    <>
+                      {formatRupiah(row.price.pricePerBaseUnitAfterTax)}
+                      <span className="block text-xs font-normal text-amber-700">
+                        + ongkir (belum dikonfirmasi)
+                      </span>
+                    </>
+                  ) : (
+                    formatRupiah(row.money.finalPricePerBaseUnit)
+                  )}
                 </p>
               </div>
               <div>
                 <p className="text-slate-500">Total pembayaran</p>
                 <p className="text-lg font-bold text-slate-900">
-                  <MoneyOrConfirm value={row.money.totalCost} />
+                  {row.money.totalCost === null ? (
+                    <>
+                      {formatRupiah(row.money.subtotalAfterTax)}
+                      <span className="block text-xs font-normal text-amber-700">
+                        belum termasuk ongkir
+                      </span>
+                    </>
+                  ) : (
+                    formatRupiah(row.money.totalCost)
+                  )}
                 </p>
               </div>
               <div>

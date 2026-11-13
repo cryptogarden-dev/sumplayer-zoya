@@ -43,12 +43,22 @@ function sortRows(rows: ComparisonRowDto[], sortKey: SortKey): ComparisonRowDto[
   copy.sort((rowA, rowB) => {
     switch (sortKey) {
       case "unitPrice":
+        // Harga akhir dipakai bila ongkir diketahui, kalau tidak pakai
+        // harga/satuan sebelum ongkir — supaya baris tetap bisa diurutkan
+        // dan tidak semua jatuh ke bawah sebagai null.
         return compareNullableAsc(
-          toDecimal(rowA.money.finalPricePerBaseUnit),
-          toDecimal(rowB.money.finalPricePerBaseUnit),
+          toDecimal(
+            rowA.money.finalPricePerBaseUnit ?? rowA.money.finalPricePerBaseUnitBeforeShipping,
+          ),
+          toDecimal(
+            rowB.money.finalPricePerBaseUnit ?? rowB.money.finalPricePerBaseUnitBeforeShipping,
+          ),
         );
       case "totalCost":
-        return compareNullableAsc(toDecimal(rowA.money.totalCost), toDecimal(rowB.money.totalCost));
+        return compareNullableAsc(
+          toDecimal(rowA.money.totalCost ?? rowA.money.totalCostBeforeShipping),
+          toDecimal(rowB.money.totalCost ?? rowB.money.totalCostBeforeShipping),
+        );
       case "arrival":
         return (
           new Date(rowA.delivery.estimatedArrivalMax).getTime() -
@@ -259,9 +269,9 @@ export function ComparisonView() {
             {selectedRow ? (
               <Card className="border-indigo-300 bg-indigo-50">
                 <p className="text-sm font-semibold text-indigo-900">
-                  Dipilih: {selectedRow.supplier.name} — Total{" "}
+                  Dipilih: {selectedRow.supplier.name} — Total produk{" "}
                   {selectedRow.money.totalCost === null
-                    ? "menunggu konfirmasi ongkir"
+                    ? `${formatRupiah(selectedRow.money.totalCostBeforeShipping)} (belum termasuk ongkir, menunggu konfirmasi ongkir)`
                     : formatRupiah(selectedRow.money.totalCost)}
                 </p>
                 <p className="mt-1 text-sm text-indigo-800">

@@ -120,6 +120,10 @@ export interface ComparisonRow {
     requiresShippingConfirmation: boolean;
     totalCost: Decimal | null;
     finalPricePerBaseUnit: Decimal | null;
+    /** Total produk sebelum ongkir (= subtotal). Selalu ada; BUKAN total akhir bila ongkir belum diketahui. */
+    totalCostBeforeShipping: Decimal;
+    /** Harga/satuan dasar sebelum ongkir. Selalu ada; BUKAN harga akhir bila ongkir belum diketahui. */
+    finalPricePerBaseUnitBeforeShipping: Decimal;
   };
   delivery: {
     leadTimeDaysMin: number;
@@ -384,6 +388,9 @@ export function serializeComparisonResult(result: ComparisonResult) {
         shippingFee: decimalOrNull(row.money.shippingFee),
         totalCost: decimalOrNull(row.money.totalCost),
         finalPricePerBaseUnit: decimalOrNull(row.money.finalPricePerBaseUnit),
+        totalCostBeforeShipping: row.money.totalCostBeforeShipping.toString(),
+        finalPricePerBaseUnitBeforeShipping:
+          row.money.finalPricePerBaseUnitBeforeShipping.toString(),
       },
       delivery: {
         ...row.delivery,
@@ -450,9 +457,16 @@ export async function buildComparison(input: BuildComparisonInput): Promise<Comp
     });
   });
 
+  // Perbandingan harga produk tetap bisa diurutkan/dilabeli walau ongkir
+  // belum diketahui: pakai total SEBELUM ongkir sebagai pembanding.
+  // Ini bukan total akhir — catatan "ongkir belum dapat dipastikan" tetap
+  // ditambahkan di atas, dan UI wajib menandai harga ini "belum termasuk
+  // ongkir". Tanpa fallback ini, semua kandidat bernilai null, label
+  // "Termurah" tidak pernah muncul, dan skor rekomendasi kehilangan
+  // komponen biayanya.
   const scoreInputs = contexts.map((ctx) => ({
     id: ctx.offer.id,
-    totalCost: ctx.orderTotal.totalCost,
+    totalCost: ctx.orderTotal.totalCost ?? ctx.orderTotal.totalCostBeforeShipping,
     reliability: ctx.reliability.hasHistory
       ? ctx.reliability.rate.toNumber()
       : availabilityProxyScore(ctx.stockEval),
@@ -466,8 +480,9 @@ export async function buildComparison(input: BuildComparisonInput): Promise<Comp
 
   const labelInputRows: LabelInputRow[] = contexts.map((ctx, index) => ({
     id: ctx.offer.id,
-    finalPricePerBaseUnit: ctx.orderTotal.finalPricePerBaseUnit,
-    totalCost: ctx.orderTotal.totalCost,
+    finalPricePerBaseUnit:
+      ctx.orderTotal.finalPricePerBaseUnit ?? ctx.orderTotal.finalPricePerBaseUnitBeforeShipping,
+    totalCost: ctx.orderTotal.totalCost ?? ctx.orderTotal.totalCostBeforeShipping,
     isFreeShipping: ctx.shipping.isFreeShipping,
     estimatedArrivalMax: ctx.delivery.estimatedArrivalMax,
     proximityScore: ctx.proximity.score,
@@ -555,6 +570,8 @@ export async function buildComparison(input: BuildComparisonInput): Promise<Comp
         requiresShippingConfirmation: ctx.shipping.requiresConfirmation,
         totalCost: ctx.orderTotal.totalCost,
         finalPricePerBaseUnit: ctx.orderTotal.finalPricePerBaseUnit,
+        totalCostBeforeShipping: ctx.orderTotal.totalCostBeforeShipping,
+        finalPricePerBaseUnitBeforeShipping: ctx.orderTotal.finalPricePerBaseUnitBeforeShipping,
       },
       delivery: {
         leadTimeDaysMin: offer.estimatedDeliveryDaysMin ?? offer.supplier.leadTimeDaysMin,

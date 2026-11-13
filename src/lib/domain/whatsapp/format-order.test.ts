@@ -40,6 +40,23 @@ describe("formatWhatsAppOrderMessage (R17)", () => {
     expect(message).not.toContain("Rp0");
   });
 
+  it("menampilkan total produk bila ongkir belum diketahui, dengan keterangan belum termasuk ongkir", () => {
+    const message = formatWhatsAppOrderMessage({
+      supplierName: "CV Sumber Pangan",
+      productName: "Beras Premium",
+      packageTypeLabel: "Karung",
+      packagesToBuy: 2,
+      actualQuantity: 50,
+      baseUnitLabel: "kg",
+      totalCost: null,
+      totalCostBeforeShipping: 700000,
+      neededByDate: new Date("2026-08-25"),
+    });
+    expect(message).toMatch(/Rp\s?700\.000/);
+    expect(message).toContain("belum termasuk ongkir");
+    expect(message).toContain("menunggu konfirmasi ongkir");
+  });
+
   it("menyertakan catatan bila diisi", () => {
     const message = formatWhatsAppOrderMessage({
       supplierName: "CV Sumber Pangan",

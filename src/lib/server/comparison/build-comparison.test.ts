@@ -206,6 +206,10 @@ describe("buildComparison — alur utama halaman Bandingkan (Tahap 4)", () => {
     expect(row.money.totalCost).toBeNull();
     expect(row.money.finalPricePerBaseUnit).toBeNull();
     expect(row.money.requiresShippingConfirmation).toBe(true);
+    // Total akhir memang belum pasti, tapi total produknya tetap ada
+    // (subtotal) dan bisa dipakai membandingkan antar-supplier.
+    expect(row.money.totalCostBeforeShipping.toNumber()).toBeGreaterThan(0);
+    expect(row.money.finalPricePerBaseUnitBeforeShipping.toNumber()).toBeGreaterThan(0);
     expect(row.needsConfirmation).toBe(true);
     expect(row.eligible).toBe(false);
   });

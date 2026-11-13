@@ -35,6 +35,7 @@ export function buildRowWhatsAppUrl(
     actualQuantity: row.purchase.actualQuantityInBaseUnit,
     baseUnitLabel: baseUnitLabel(row.packaging.baseUnit),
     totalCost: row.money.totalCost,
+    totalCostBeforeShipping: row.money.totalCostBeforeShipping,
     neededByDate,
   });
 
