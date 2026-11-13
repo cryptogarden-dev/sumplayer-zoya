@@ -20,11 +20,11 @@ vi.mock("next/link", () => ({
 
 import { BottomNav } from "@/components/app-shell/BottomNav";
 
-describe("BottomNav (R24 - navigasi bawah di HP, R25 - 4 menu utama)", () => {
-  it("menampilkan tepat 4 tautan navigasi", () => {
+describe("BottomNav (R24 - navigasi bawah di HP, R25 - 5 menu utama)", () => {
+  it("menampilkan tepat 5 tautan navigasi", () => {
     render(<BottomNav />);
     const nav = screen.getByRole("navigation", { name: "Navigasi utama" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(4);
+    expect(within(nav).getAllByRole("link")).toHaveLength(5);
   });
 
   it("menandai menu yang sesuai dengan halaman aktif", () => {
@@ -33,10 +33,11 @@ describe("BottomNav (R24 - navigasi bawah di HP, R25 - 4 menu utama)", () => {
     expect(screen.getByRole("link", { name: /produk/i })).not.toHaveAttribute("aria-current");
   });
 
-  it("menampilkan label Supplier, Produk, Bandingkan, dan Pesanan", () => {
+  it("menampilkan label Supplier, Produk, Stok Toko, Bandingkan, dan Pesanan", () => {
     render(<BottomNav />);
     expect(screen.getByRole("link", { name: /supplier/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /produk/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /stok toko/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /bandingkan/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /pesanan/i })).toBeInTheDocument();
   });
