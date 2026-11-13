@@ -17,6 +17,10 @@ const PLACEHOLDER_TONE_CLASSES: Record<BadgeTone, string> = {
   sky: "bg-sky-100 text-sky-500",
   violet: "bg-violet-100 text-violet-500",
   rose: "bg-rose-100 text-rose-500",
+  // Wajib ada karena Record<BadgeTone, string> (tone "success" ditambah ke
+  // Badge di upgrade UI Zoya); categoryTone tidak pernah mengembalikan
+  // "success", jadi entri ini hanya pelengkap tipe.
+  success: "bg-success-bg text-success",
 };
 
 export interface ProductCardData {
