@@ -16,10 +16,10 @@ export function Chip({ active, className, ...props }: ChipProps) {
     <button
       type="button"
       className={clsx(
-        "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600",
+        "focus-visible:outline-slate inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2",
         active
-          ? "border-indigo-600 bg-indigo-600 text-white"
-          : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:text-indigo-700",
+          ? "border-slate bg-slate text-white"
+          : "border-divider text-mist hover:border-cloud hover:text-slate bg-white",
         className,
       )}
       {...props}

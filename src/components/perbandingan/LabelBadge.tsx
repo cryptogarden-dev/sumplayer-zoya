@@ -15,7 +15,11 @@ const WARNING_LABELS: string[] = [LABEL.STOCK_LIMITED, LABEL.NEEDS_CONFIRMATION]
 
 function labelClasses(label: string): string {
   if (label === LABEL.RECOMMENDED) {
-    return "bg-indigo-600 text-white";
+    return "bg-slate text-white";
+  }
+  // "Termurah" memakai aksen kunyit brand Zoya (docs/design/DESIGN_SPEC.md).
+  if (label === LABEL.CHEAPEST_UNIT_PRICE || label === LABEL.CHEAPEST_TOTAL) {
+    return "bg-kunyit-soft text-kunyit";
   }
   if (POSITIVE_LABELS.includes(label)) {
     return "bg-emerald-100 text-emerald-800";

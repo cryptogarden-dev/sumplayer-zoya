@@ -198,7 +198,7 @@ function ProductQuickOrderBody({
           </p>
           <Link
             href={`/produk/${product.id}`}
-            className="mt-2 inline-block text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+            className="text-slate mt-2 inline-block text-sm font-semibold underline-offset-2 hover:underline"
           >
             Buka halaman edit produk →
           </Link>
@@ -252,7 +252,7 @@ function ProductQuickOrderBody({
             <p className="text-sm text-slate-500">Belum ada supplier untuk produk ini.</p>
             <Link
               href={`/produk/${product.id}`}
-              className="mt-2 inline-block text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+              className="text-slate mt-2 inline-block text-sm font-semibold underline-offset-2 hover:underline"
             >
               Tambah penawaran supplier →
             </Link>

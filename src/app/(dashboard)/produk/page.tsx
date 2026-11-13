@@ -40,7 +40,7 @@ export default async function ProdukPage() {
         />
         <Link
           href="/produk/baru"
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="bg-slate hover:bg-slate/90 focus-visible:outline-slate inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
         >
           Tambah Produk
         </Link>

@@ -21,7 +21,7 @@ export function ComparisonFilters({ value, onChange }: ComparisonFiltersProps) {
         <label key={option.key} className="flex min-h-11 items-center gap-2 text-sm text-slate-700">
           <input
             type="checkbox"
-            className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            className="text-slate focus:ring-slate h-5 w-5 rounded border-slate-300"
             checked={value[option.key]}
             onChange={(event) => onChange({ ...value, [option.key]: event.target.checked })}
           />

@@ -26,7 +26,7 @@ export function AppShell({
       <Sidebar />
       <div className="flex min-h-dvh flex-1 flex-col">
         <Header session={session} cartCount={cartCount} />
-        <main className="flex-1 px-4 pt-4 pb-24 sm:px-6 lg:px-8 lg:pb-8">{children}</main>
+        <main className="flex-1 px-4 pt-6 pb-24 sm:px-6 lg:px-10 lg:pt-8 lg:pb-8">{children}</main>
       </div>
       <BottomNav />
     </div>

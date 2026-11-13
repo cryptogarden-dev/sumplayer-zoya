@@ -81,9 +81,9 @@ export function ProductCard({
           onSelect(product.id);
         }
       }}
-      className="flex h-full cursor-pointer flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+      className="border-divider hover:border-cloud focus-visible:outline-slate flex h-full cursor-pointer flex-col overflow-hidden rounded-[20px] border bg-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
     >
-      <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-slate-50">
+      <div className="bg-page relative m-2.5 mb-0 flex aspect-square items-center justify-center overflow-hidden rounded-[14px]">
         {product.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- foto dari tautan bebas/Supabase Storage
           <img
@@ -111,7 +111,7 @@ export function ProductCard({
         <Link
           href={`/produk/${product.id}`}
           onClick={(event) => event.stopPropagation()}
-          className="absolute right-2 bottom-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-sm hover:text-indigo-600"
+          className="hover:text-slate absolute right-2 bottom-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-sm"
           aria-label="Edit produk"
           title="Edit produk"
         >
@@ -128,8 +128,8 @@ export function ProductCard({
         <h3 className="line-clamp-2 text-sm font-semibold text-slate-900">{product.productName}</h3>
         {subtitle ? <p className="line-clamp-1 text-xs text-slate-500">{subtitle}</p> : null}
         {product.lowestPrice != null ? (
-          <p className="text-sm font-semibold text-slate-900">
-            Mulai {formatRupiah(product.lowestPrice)}
+          <p className="text-kunyit text-sm font-semibold">
+            Modal {formatRupiah(product.lowestPrice)}
           </p>
         ) : null}
         {product.sellPricePerBaseUnit != null ? (
@@ -165,7 +165,7 @@ export function ProductCard({
         </p>
 
         <div className="mt-auto flex items-center justify-between pt-2 text-xs">
-          <span className="font-medium text-indigo-600">
+          <span className="text-slate font-medium">
             {product.offerCount === 0
               ? "Belum ada supplier"
               : `${product.offerCount} penawaran supplier`}

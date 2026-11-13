@@ -4,7 +4,7 @@ export default function RootLoading() {
       <div
         role="status"
         aria-label="Memuat"
-        className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-indigo-600"
+        className="border-t-slate h-10 w-10 animate-spin rounded-full border-4 border-slate-200"
       />
     </div>
   );

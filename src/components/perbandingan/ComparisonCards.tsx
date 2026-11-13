@@ -37,7 +37,7 @@ export function ComparisonCards({
         const isSelected = row.offerId === selectedOfferId;
 
         return (
-          <Card key={row.offerId} className={isSelected ? "ring-2 ring-indigo-500" : undefined}>
+          <Card key={row.offerId} className={isSelected ? "ring-slate ring-2" : undefined}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-base font-semibold text-slate-900">{row.supplier.name}</h3>

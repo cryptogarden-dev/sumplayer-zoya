@@ -1,0 +1,4 @@
+// tempel ke tailwind.config.js -> theme.extend
+module.exports = { colors: { slate: { DEFAULT: '#2E4558' }, mist: '#5E7C93', cloud: '#DCE5EC', navactive: '#E6EDF2', kunyit: { DEFAULT: '#C9774F', soft: '#F6E7DF' }, page: '#F4F6F8', muted: '#7D8F9E', divider: '#EDF1F4' },
+  fontFamily: { display: ['"Cormorant Garamond"', 'serif'], sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+  borderRadius: { card: '20px', btn: '12px' } };

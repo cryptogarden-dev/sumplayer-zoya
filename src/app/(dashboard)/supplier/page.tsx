@@ -5,6 +5,8 @@ import { listSuppliers } from "@/lib/server/repositories/supplier-repository";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Card } from "@/components/ui/Card";
+import { StatCard } from "@/components/ui/StatCard";
+import { Badge } from "@/components/ui/Badge";
 
 export const metadata: Metadata = { title: "Supplier" };
 export const dynamic = "force-dynamic";
@@ -22,6 +24,17 @@ export default async function SupplierPage() {
   // diaktifkan/dihapus lagi — sebelumnya hilang total dari daftar.
   const suppliers = await listSuppliers(session.user.businessId, { includeInactive: true });
 
+  // KPI dihitung dari data yang sudah diambil (tanpa query tambahan):
+  // total, aktif, produk ditawarkan, dan area (pasangan provinsi+kota)
+  // yang dilayani. Kartu ke-4 tampil gelap (docs/design/DESIGN_SPEC.md §5).
+  const activeCount = suppliers.filter((supplier) => supplier.isActive).length;
+  const offeredCount = suppliers.reduce(
+    (sum, supplier) => sum + supplier._count.supplierProducts,
+    0,
+  );
+  const areaCount = new Set(suppliers.map((supplier) => `${supplier.province}|${supplier.city}`))
+    .size;
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -31,39 +44,49 @@ export default async function SupplierPage() {
         />
         <Link
           href="/supplier/baru"
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="bg-slate hover:bg-slate/90 focus-visible:outline-slate inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
         >
           Tambah Supplier
         </Link>
       </div>
 
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Total Supplier" value={suppliers.length} />
+        <StatCard label="Supplier Aktif" value={activeCount} />
+        <StatCard label="Produk Ditawarkan" value={offeredCount} />
+        <StatCard label="Area Terlayani" value={areaCount} variant="dark" />
+      </div>
+
       {suppliers.length === 0 ? (
         <EmptyState
           title="Belum ada supplier"
-          description="Belum ada data supplier untuk bisnis ini. Form tambah supplier akan tersedia pada langkah berikutnya."
+          description='Belum ada data supplier untuk bisnis ini. Klik "Tambah Supplier" untuk menambahkan supplier pertama.'
         />
       ) : (
         <div className="space-y-3">
           {suppliers.map((supplier) => (
             <Link key={supplier.id} href={`/supplier/${supplier.id}`} className="block">
-              <Card className="transition-shadow hover:shadow-md">
+              <Card className="hover:border-cloud transition-colors">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-900">
-                      {supplier.supplierName}
-                    </h3>
-                    <p className="text-sm text-slate-500">
-                      {supplier.city}, {supplier.province}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {supplier.whatsappNumber ?? supplier.phoneNumber ?? "Belum ada kontak"}
-                    </p>
+                  <div className="flex items-start gap-3">
+                    <span className="bg-navactive text-slate flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold">
+                      {supplier.supplierName.trim().charAt(0).toUpperCase() || "?"}
+                    </span>
+                    <div>
+                      <h3 className="text-slate text-[15px] font-bold">{supplier.supplierName}</h3>
+                      <p className="text-muted text-[13px]">
+                        {supplier.city}, {supplier.province}
+                      </p>
+                      <p className="text-slate mt-1 text-sm">
+                        {supplier.whatsappNumber ?? supplier.phoneNumber ?? "Belum ada kontak"}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right text-sm text-slate-500">
+                  <div className="text-muted flex flex-col items-end gap-2 text-sm">
                     <p>{supplier._count.supplierProducts} produk ditawarkan</p>
-                    <p className={supplier.isActive ? "text-emerald-600" : "text-slate-400"}>
+                    <Badge tone={supplier.isActive ? "success" : "slate"}>
                       {supplier.isActive ? "Aktif" : "Nonaktif"}
-                    </p>
+                    </Badge>
                   </div>
                 </div>
               </Card>

@@ -70,7 +70,7 @@ export function CategoryPicker({
         <Label htmlFor="categoryId">Kategori</Label>
         <button
           type="button"
-          className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+          className="text-slate text-xs font-semibold underline-offset-2 hover:underline"
           onClick={() => {
             setCreateError(null);
             setIsAdding((current) => !current);

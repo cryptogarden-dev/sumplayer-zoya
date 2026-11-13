@@ -104,7 +104,7 @@ export function TaxRateForm() {
           type="checkbox"
           checked={isDefault}
           onChange={(event) => setIsDefault(event.target.checked)}
-          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+          className="text-slate focus:ring-slate h-4 w-4 rounded border-slate-300"
         />
         <Label htmlFor="tax-is-default" className="mb-0">
           Jadikan tarif default

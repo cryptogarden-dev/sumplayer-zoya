@@ -23,7 +23,7 @@ export default function GlobalError({
       <button
         type="button"
         onClick={() => reset()}
-        className="mt-6 inline-flex min-h-11 items-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700"
+        className="bg-slate hover:bg-slate/90 mt-6 inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-semibold text-white"
       >
         Coba lagi
       </button>

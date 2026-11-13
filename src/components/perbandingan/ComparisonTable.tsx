@@ -45,11 +45,11 @@ function Th({
 }) {
   const isActive = sortKey === activeSortKey;
   return (
-    <th className="px-3 py-2 text-left font-semibold text-slate-600">
+    <th className="text-muted px-3 py-2 text-left text-[13px] font-semibold tracking-wide uppercase">
       <button
         type="button"
         onClick={() => onSortKeyChange(sortKey)}
-        className="inline-flex items-center gap-1 hover:text-indigo-600"
+        className="hover:text-slate inline-flex items-center gap-1"
       >
         {label} {isActive ? "▲" : ""}
       </button>
@@ -67,14 +67,16 @@ export function ComparisonTable({
   onSortKeyChange,
 }: ComparisonTableProps) {
   return (
-    <div className="hidden overflow-x-auto rounded-xl border border-slate-200 lg:block">
+    <div className="border-divider hidden overflow-x-auto rounded-[20px] border lg:block">
       <table className="w-full min-w-[1100px] text-left text-sm">
-        <thead className="bg-slate-50 text-slate-500">
+        <thead className="bg-page text-muted">
           <tr>
-            <th className="px-3 py-2 font-semibold">Supplier</th>
-            <th className="px-3 py-2 font-semibold">Label</th>
-            <th className="px-3 py-2 font-semibold">Stok</th>
-            <th className="px-3 py-2 font-semibold">Kemasan</th>
+            <th className="px-3 py-2 text-[13px] font-semibold tracking-wide uppercase">
+              Supplier
+            </th>
+            <th className="px-3 py-2 text-[13px] font-semibold tracking-wide uppercase">Label</th>
+            <th className="px-3 py-2 text-[13px] font-semibold tracking-wide uppercase">Stok</th>
+            <th className="px-3 py-2 text-[13px] font-semibold tracking-wide uppercase">Kemasan</th>
             {SORT_COLUMNS.map((col) => (
               <Th
                 key={col.key}
@@ -84,17 +86,17 @@ export function ComparisonTable({
                 onSortKeyChange={onSortKeyChange}
               />
             ))}
-            <th className="px-3 py-2 font-semibold">Total</th>
-            <th className="px-3 py-2 font-semibold">Aksi</th>
+            <th className="px-3 py-2 text-[13px] font-semibold tracking-wide uppercase">Total</th>
+            <th className="px-3 py-2 text-[13px] font-semibold tracking-wide uppercase">Aksi</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-divider divide-y">
           {rows.map((row) => {
             const whatsappUrl = buildRowWhatsAppUrl(row, productName, neededByDate);
             const isSelected = row.offerId === selectedOfferId;
 
             return (
-              <tr key={row.offerId} className={isSelected ? "bg-indigo-50" : undefined}>
+              <tr key={row.offerId} className={isSelected ? "bg-navactive" : undefined}>
                 <td className="px-3 py-2 align-top">
                   <p className="font-semibold text-slate-900">{row.supplier.name}</p>
                   <p className="text-xs text-slate-500">

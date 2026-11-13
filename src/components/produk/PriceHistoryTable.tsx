@@ -65,7 +65,7 @@ export function PriceHistoryTable({ rows }: { rows: PriceHistoryTableRow[] }) {
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   {row.source === "PEMBELIAN" ? (
-                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                    <span className="bg-cloud text-slate rounded-full px-2 py-0.5 text-xs font-medium">
                       Pembelian {row.orderNumber}
                     </span>
                   ) : (

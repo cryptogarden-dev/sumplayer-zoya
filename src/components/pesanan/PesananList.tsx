@@ -4,19 +4,33 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatRupiah } from "@/lib/format/currency";
 import { formatTanggalIndonesia } from "@/lib/format/date";
 import { PURCHASE_ORDER_STATUS_LABELS } from "@/lib/format/orders";
 
-const STATUS_COLOR: Record<string, string> = {
-  DRAFT: "text-slate-500",
-  DIPESAN: "text-amber-600",
-  DIKONFIRMASI: "text-emerald-600",
-  DIKIRIM: "text-emerald-600",
-  DITERIMA: "text-emerald-600",
-  DIBATALKAN: "text-red-600",
+/** Warna pill status (docs/design/DESIGN_SPEC.md §5): selesai pakai hijau
+ * brand Zoya, diproses kuning, batal merah, draft netral. */
+const STATUS_TONE: Record<string, BadgeTone> = {
+  DRAFT: "slate",
+  DIPESAN: "amber",
+  DIKONFIRMASI: "success",
+  DIKIRIM: "success",
+  DITERIMA: "success",
+  DIBATALKAN: "red",
 };
+
+/** Tab filter status (docs/design/DESIGN_SPEC.md §5) — filter di sisi
+ * klien dari daftar yang sudah diambil, tanpa fetch tambahan. Tab aktif:
+ * bg slate teks putih; tidak aktif: putih teks mist. */
+const TABS: { key: string; label: string; statuses: string[] | null }[] = [
+  { key: "semua", label: "Semua", statuses: null },
+  { key: "diproses", label: "Diproses", statuses: ["DRAFT", "DIPESAN", "DIKONFIRMASI"] },
+  { key: "dikirim", label: "Dikirim", statuses: ["DIKIRIM"] },
+  { key: "selesai", label: "Selesai", statuses: ["DITERIMA"] },
+  { key: "dibatalkan", label: "Dibatalkan", statuses: ["DIBATALKAN"] },
+];
 
 /** Status yang boleh dihapus permanen langsung (docs/BACKLOG.md #5) -
  * DRAFT/DIBATALKAN kapan saja, DITERIMA juga boleh (stok toko yang dulu
@@ -55,11 +69,47 @@ export interface PesananListItem {
  * draft/pesanan yang dibatalkan supaya tidak menumpuk terus.
  */
 export function PesananList({ orders }: { orders: PesananListItem[] }) {
+  const [activeTab, setActiveTab] = useState("semua");
+  const tab = TABS.find((t) => t.key === activeTab) ?? TABS[0]!;
+  const visibleOrders =
+    tab.statuses === null ? orders : orders.filter((order) => tab.statuses!.includes(order.status));
+
   return (
     <div className="space-y-3">
-      {orders.map((order) => (
-        <PesananListCard key={order.id} order={order} />
-      ))}
+      <div
+        className="flex gap-2 overflow-x-auto pb-1"
+        role="tablist"
+        aria-label="Filter status pesanan"
+      >
+        {TABS.map((t) => {
+          const count =
+            t.statuses === null
+              ? orders.length
+              : orders.filter((order) => t.statuses!.includes(order.status)).length;
+          const active = t.key === activeTab;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setActiveTab(t.key)}
+              className={
+                active
+                  ? "bg-slate inline-flex min-h-9 shrink-0 items-center rounded-full px-3.5 text-sm font-semibold text-white"
+                  : "border-divider text-mist hover:text-slate inline-flex min-h-9 shrink-0 items-center rounded-full border bg-white px-3.5 text-sm font-medium"
+              }
+            >
+              {t.label} ({count})
+            </button>
+          );
+        })}
+      </div>
+      {visibleOrders.length === 0 ? (
+        <p className="text-muted py-8 text-center text-sm">Tidak ada pesanan pada tab ini.</p>
+      ) : (
+        visibleOrders.map((order) => <PesananListCard key={order.id} order={order} />)
+      )}
     </div>
   );
 }
@@ -87,24 +137,24 @@ function PesananListCard({ order }: { order: PesananListItem }) {
 
   return (
     <>
-      <Card className="relative transition-shadow hover:shadow-md">
+      <Card className="hover:border-cloud relative transition-colors">
         <Link href={`/pesanan/${order.id}`} className="block">
           <div className="flex flex-wrap items-start justify-between gap-3 pr-16">
             <div>
-              <h3 className="text-base font-semibold text-slate-900">
+              <h3 className="text-slate text-[15px] font-bold">
                 {order.orderNumber ?? "Draft"} - {order.supplierName}
               </h3>
-              <p className="text-sm text-slate-500">
+              <p className="text-muted text-[13px]">
                 {order.itemCount} produk · {formatTanggalIndonesia(order.createdAt)}
               </p>
             </div>
-            <div className="text-right text-sm">
-              <p className="font-semibold text-slate-900">{formatRupiah(order.total)}</p>
-              <p className={STATUS_COLOR[order.status] ?? "text-slate-500"}>
+            <div className="flex flex-col items-end gap-2 text-sm">
+              <p className="text-slate font-semibold">{formatRupiah(order.total)}</p>
+              <Badge tone={STATUS_TONE[order.status] ?? "slate"}>
                 {PURCHASE_ORDER_STATUS_LABELS[
                   order.status as keyof typeof PURCHASE_ORDER_STATUS_LABELS
                 ] ?? order.status}
-              </p>
+              </Badge>
             </div>
           </div>
         </Link>

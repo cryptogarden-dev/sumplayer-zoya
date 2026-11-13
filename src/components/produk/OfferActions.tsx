@@ -53,7 +53,7 @@ export function OfferActions({ offerId, isActive }: { offerId: string; isActive:
         type="button"
         disabled={isSubmitting}
         onClick={handleToggle}
-        className="text-xs font-semibold text-indigo-600 hover:underline disabled:opacity-60"
+        className="text-slate text-xs font-semibold hover:underline disabled:opacity-60"
       >
         {isActive ? "Nonaktifkan" : "Aktifkan"}
       </button>

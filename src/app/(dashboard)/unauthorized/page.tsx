@@ -15,7 +15,10 @@ export default function UnauthorizedPage() {
         Halaman ini hanya dapat diakses oleh peran tertentu (misalnya Pemilik/Admin). Hubungi
         pemilik usaha Anda jika membutuhkan akses.
       </p>
-      <Link href="/" className="mt-4 text-sm font-semibold text-indigo-600 hover:text-indigo-700">
+      <Link
+        href="/"
+        className="text-slate mt-4 text-sm font-semibold underline-offset-2 hover:underline"
+      >
         Kembali ke Beranda
       </Link>
     </div>

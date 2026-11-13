@@ -17,7 +17,7 @@ export default function RegisterPage() {
       </div>
       <p className="mt-6 text-center text-sm text-slate-500">
         Sudah punya akun?{" "}
-        <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-700">
+        <Link href="/login" className="text-slate font-semibold underline-offset-2 hover:underline">
           Masuk di sini
         </Link>
       </p>

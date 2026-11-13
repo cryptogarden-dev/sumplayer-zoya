@@ -50,7 +50,7 @@ export default async function BusinessLocationsPage() {
                     ) : null}
                   </div>
                   <div className="text-right text-sm text-slate-500">
-                    {location.isDefault ? <p className="text-indigo-600">Default</p> : null}
+                    {location.isDefault ? <p className="text-slate">Default</p> : null}
                     <p className={location.isActive ? "text-emerald-600" : "text-slate-400"}>
                       {location.isActive ? "Aktif" : "Nonaktif"}
                     </p>

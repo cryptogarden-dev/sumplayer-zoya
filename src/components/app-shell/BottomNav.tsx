@@ -18,7 +18,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Navigasi utama"
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
+      className="border-divider fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
       {NAV_ITEMS.map((item) => {
         const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
@@ -28,8 +28,8 @@ export function BottomNav() {
             href={item.href}
             aria-current={active ? "page" : undefined}
             className={clsx(
-              "flex min-h-14 flex-col items-center justify-center gap-1 text-xs font-medium",
-              active ? "text-indigo-600" : "text-slate-500",
+              "flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-xs",
+              active ? "bg-navactive text-slate font-semibold" : "text-mist font-medium",
             )}
           >
             <NavIcon name={item.icon} className="h-6 w-6" />

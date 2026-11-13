@@ -44,7 +44,7 @@ export default async function TaxRatesPage() {
                     <p className="text-sm text-slate-500">{rate.ratePercent.toString()}%</p>
                   </div>
                   <div className="text-right text-sm text-slate-500">
-                    {rate.isDefault ? <p className="text-indigo-600">Default</p> : null}
+                    {rate.isDefault ? <p className="text-slate">Default</p> : null}
                     <p className={rate.isActive ? "text-emerald-600" : "text-slate-400"}>
                       {rate.isActive ? "Aktif" : "Nonaktif"}
                     </p>

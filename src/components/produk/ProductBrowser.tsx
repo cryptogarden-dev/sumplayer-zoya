@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Chip } from "@/components/ui/Chip";
@@ -115,6 +116,13 @@ export function ProductBrowser({
           {filtered.map((product) => (
             <ProductCard key={product.id} product={product} onSelect={setSelectedProductId} />
           ))}
+          <Link
+            href="/produk/baru"
+            className="border-cloud text-mist hover:border-slate hover:text-slate flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-[20px] border-2 border-dashed bg-white p-4 text-center text-sm font-medium transition-colors"
+          >
+            <span className="text-2xl leading-none">+</span>
+            Tambah produk baru
+          </Link>
         </div>
       )}
 

@@ -1,9 +1,28 @@
 @import "tailwindcss";
 
+/**
+ * Token brand Zoya (docs/design/DESIGN_SPEC.md + tokens.json).
+ * Tailwind v4: token masuk ke `@theme` di sini, bukan tailwind.config.js.
+ * `--color-slate` hanya menambah utilitas `slate` polos (#2E4558) — palet
+ * `slate-50..950` bawaan Tailwind tetap utuh.
+ */
 @theme {
-  --color-brand-50: #eef2ff;
-  --color-brand-600: #4f46e5;
-  --color-brand-700: #4338ca;
+  --color-slate: #2e4558;
+  --color-mist: #5e7c93;
+  --color-cloud: #dce5ec;
+  --color-navactive: #e6edf2;
+  --color-kunyit: #c9774f;
+  --color-kunyit-soft: #f6e7df;
+  --color-page: #f4f6f8;
+  --color-muted: #7d8f9e;
+  --color-divider: #edf1f4;
+  --color-success: #3f8a62;
+  --color-success-bg: #e3f1ea;
+
+  --font-display: var(--font-zoya-display), Georgia, "Times New Roman", serif;
+  --font-sans:
+    var(--font-zoya-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
 }
 
 html,
@@ -12,13 +31,6 @@ body {
 }
 
 body {
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    Helvetica,
-    Arial,
-    sans-serif;
+  background-color: #f4f6f8;
+  color: #2e4558;
 }

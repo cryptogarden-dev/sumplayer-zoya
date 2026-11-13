@@ -16,7 +16,10 @@ export default function LoginPage() {
       </div>
       <p className="mt-6 text-center text-sm text-slate-500">
         Belum punya akun?{" "}
-        <Link href="/register" className="font-semibold text-indigo-600 hover:text-indigo-700">
+        <Link
+          href="/register"
+          className="text-slate font-semibold underline-offset-2 hover:underline"
+        >
           Daftarkan usaha Anda
         </Link>
       </p>

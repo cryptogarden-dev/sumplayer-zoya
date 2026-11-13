@@ -229,7 +229,7 @@ export function ComparisonForm({
                 <div className="sm:col-span-2 lg:col-span-3">
                   <button
                     type="button"
-                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                    className="text-slate text-xs font-semibold underline-offset-2 hover:underline"
                     onClick={() => setManualMode(false)}
                   >
                     Gunakan cabang tersimpan

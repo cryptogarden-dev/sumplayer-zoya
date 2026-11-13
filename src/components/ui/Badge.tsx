@@ -2,7 +2,7 @@ import type { HTMLAttributes } from "react";
 import clsx from "clsx";
 
 export type BadgeTone =
-  "slate" | "indigo" | "emerald" | "amber" | "red" | "sky" | "violet" | "rose";
+  "slate" | "indigo" | "emerald" | "amber" | "red" | "sky" | "violet" | "rose" | "success";
 
 const TONE_CLASSES: Record<BadgeTone, string> = {
   slate: "bg-slate-100 text-slate-600",
@@ -13,6 +13,8 @@ const TONE_CLASSES: Record<BadgeTone, string> = {
   sky: "bg-sky-100 text-sky-700",
   violet: "bg-violet-100 text-violet-700",
   rose: "bg-rose-100 text-rose-700",
+  /** Hijau brand Zoya untuk status "Aktif" (docs/design/DESIGN_SPEC.md). */
+  success: "bg-success-bg text-success",
 };
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {

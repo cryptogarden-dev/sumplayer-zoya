@@ -26,10 +26,10 @@ export function ProfileMenu({ name, email, businessName, role }: ProfileMenuProp
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
-          className="flex min-h-11 min-w-11 items-center gap-2 rounded-full border border-slate-200 px-2 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="border-divider text-slate hover:bg-page focus-visible:outline-slate flex min-h-11 min-w-11 items-center gap-2 rounded-full border px-2 py-1 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2"
           aria-label={`Menu profil untuk ${name}`}
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-sm font-semibold text-white">
+          <span className="bg-slate flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold text-white">
             {initial}
           </span>
           <NavIcon name="chevronDown" className="h-4 w-4 text-slate-400" />

@@ -15,13 +15,13 @@ interface EmptyStateProps {
  */
 export function EmptyState({ title, description, footnote }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+    <div className="border-cloud flex flex-col items-center justify-center rounded-[20px] border border-dashed bg-white px-6 py-16 text-center">
+      <span className="bg-navactive text-mist flex h-12 w-12 items-center justify-center rounded-full">
         <NavIcon name="inbox" className="h-6 w-6" />
       </span>
-      <h2 className="mt-4 text-base font-semibold text-slate-900">{title}</h2>
-      <p className="mt-1 max-w-sm text-sm text-slate-500">{description}</p>
-      {footnote ? <div className="mt-4 text-xs text-slate-400">{footnote}</div> : null}
+      <h2 className="text-slate mt-4 text-base font-semibold">{title}</h2>
+      <p className="text-muted mt-1 max-w-sm text-sm">{description}</p>
+      {footnote ? <div className="text-muted mt-4 text-xs">{footnote}</div> : null}
     </div>
   );
 }

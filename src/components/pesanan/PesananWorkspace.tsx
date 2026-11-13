@@ -857,7 +857,7 @@ export function PesananWorkspace({
                 id="receipt-notes"
                 value={receiptNotes}
                 onChange={(event) => setReceiptNotes(event.target.value)}
-                className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2 text-base text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none"
+                className="focus:border-slate focus:ring-cloud min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2 text-base text-slate-900 focus:ring-2 focus:outline-none"
               />
             </div>
             <div>
@@ -908,7 +908,7 @@ export function PesananWorkspace({
                 href={receipt.receiptPhotoUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-medium text-indigo-600 hover:text-indigo-700"
+                className="text-slate font-medium underline-offset-2 hover:underline"
               >
                 Lihat foto nota
               </a>
@@ -926,7 +926,7 @@ export function PesananWorkspace({
             required
             value={cancelReason}
             onChange={(event) => setCancelReason(event.target.value)}
-            className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-base text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none"
+            className="focus:border-slate focus:ring-cloud min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-base text-slate-900 focus:ring-2 focus:outline-none"
           />
           <div className="mt-3 flex gap-3">
             <Button variant="danger" disabled={isBusy} onClick={handleCancel}>

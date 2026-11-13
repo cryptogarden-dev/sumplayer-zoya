@@ -387,7 +387,7 @@ export function OfferForm({
       </div>
 
       {preview ? (
-        <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+        <div className="border-cloud bg-navactive text-slate rounded-lg border px-4 py-3 text-sm">
           <p>
             1 {PACKAGING_TYPE_LABELS[packageType].toLowerCase()} ={" "}
             <strong>

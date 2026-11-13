@@ -19,10 +19,10 @@ export default async function BerandaPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">
+        <h1 className="font-display text-slate text-[34px] leading-[1.15] font-semibold">
           Selamat datang, {session.user.name}
         </h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="text-muted mt-1 text-[13px]">
           {session.user.businessName} &middot; {ROLE_LABELS[session.user.role]}
         </p>
       </div>
@@ -62,7 +62,7 @@ export default async function BerandaPage() {
               >
                 <Link
                   href={`/produk/${product.id}`}
-                  className="font-medium text-slate-900 hover:text-indigo-600"
+                  className="hover:text-slate font-medium text-slate-900"
                 >
                   {product.productName}
                 </Link>

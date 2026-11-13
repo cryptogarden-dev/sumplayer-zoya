@@ -11,6 +11,8 @@ import {
 import { ComparisonFilters } from "@/components/perbandingan/ComparisonFilters";
 import { ComparisonCards } from "@/components/perbandingan/ComparisonCards";
 import { ComparisonTable } from "@/components/perbandingan/ComparisonTable";
+import { BestOfferPanel } from "@/components/perbandingan/BestOfferPanel";
+import { LABEL } from "@/lib/domain/recommendation/labels";
 import { formatRupiah } from "@/lib/format/currency";
 import type {
   ComparisonApiResponse,
@@ -213,6 +215,11 @@ export function ComparisonView() {
 
   const selectedRow = visibleRows.find((row) => row.offerId === selectedOfferId) ?? null;
   const neededByDate = result ? new Date(values.neededByDate) : new Date();
+  // Penawaran terbaik untuk panel kanan (docs/design/DESIGN_SPEC.md §5):
+  // yang berlabel "Direkomendasikan", kalau tidak ada, baris pertama hasil
+  // urutan saat ini (default: harga satuan termurah).
+  const bestRow =
+    visibleRows.find((row) => row.labels.includes(LABEL.RECOMMENDED)) ?? visibleRows[0] ?? null;
 
   return (
     <div className="space-y-6">
@@ -267,14 +274,14 @@ export function ComparisonView() {
             </Card>
 
             {selectedRow ? (
-              <Card className="border-indigo-300 bg-indigo-50">
-                <p className="text-sm font-semibold text-indigo-900">
+              <Card className="border-cloud bg-navactive">
+                <p className="text-slate text-sm font-semibold">
                   Dipilih: {selectedRow.supplier.name} — Total produk{" "}
                   {selectedRow.money.totalCost === null
                     ? `${formatRupiah(selectedRow.money.totalCostBeforeShipping)} (belum termasuk ongkir, menunggu konfirmasi ongkir)`
                     : formatRupiah(selectedRow.money.totalCost)}
                 </p>
-                <p className="mt-1 text-sm text-indigo-800">
+                <p className="text-slate mt-1 text-sm">
                   Hubungi supplier melalui tombol WhatsApp pada baris/kartu supplier tersebut untuk
                   melanjutkan pemesanan.
                 </p>
@@ -287,24 +294,31 @@ export function ComparisonView() {
                 description="Longgarkan filter di atas untuk melihat lebih banyak pilihan supplier."
               />
             ) : (
-              <>
-                <ComparisonCards
-                  rows={visibleRows}
-                  productName={result.product.productName}
-                  neededByDate={neededByDate}
-                  selectedOfferId={selectedOfferId}
-                  onSelect={setSelectedOfferId}
-                />
-                <ComparisonTable
-                  rows={visibleRows}
-                  productName={result.product.productName}
-                  neededByDate={neededByDate}
-                  selectedOfferId={selectedOfferId}
-                  onSelect={setSelectedOfferId}
-                  sortKey={sortKey}
-                  onSortKeyChange={setSortKey}
-                />
-              </>
+              <div className="grid gap-6 lg:grid-cols-3">
+                <div className="space-y-6 lg:col-span-2">
+                  <ComparisonCards
+                    rows={visibleRows}
+                    productName={result.product.productName}
+                    neededByDate={neededByDate}
+                    selectedOfferId={selectedOfferId}
+                    onSelect={setSelectedOfferId}
+                  />
+                  <ComparisonTable
+                    rows={visibleRows}
+                    productName={result.product.productName}
+                    neededByDate={neededByDate}
+                    selectedOfferId={selectedOfferId}
+                    onSelect={setSelectedOfferId}
+                    sortKey={sortKey}
+                    onSortKeyChange={setSortKey}
+                  />
+                </div>
+                {bestRow ? (
+                  <div className="order-first lg:order-none">
+                    <BestOfferPanel row={bestRow} productName={result.product.productName} />
+                  </div>
+                ) : null}
+              </div>
             )}
           </>
         )
