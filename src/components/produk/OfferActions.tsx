@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 /**
  * Aksi per baris penawaran supplier (docs/BACKLOG.md #5): nonaktifkan/
@@ -13,6 +14,7 @@ export function OfferActions({ offerId, isActive }: { offerId: string; isActive:
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   async function handleToggle() {
     setError(null);
@@ -32,14 +34,6 @@ export function OfferActions({ offerId, isActive }: { offerId: string; isActive:
   }
 
   async function handleDelete() {
-    if (
-      !window.confirm(
-        "Hapus penawaran ini secara PERMANEN? Data yang sudah dihapus tidak bisa dikembalikan.",
-      )
-    ) {
-      return;
-    }
-
     setError(null);
     setIsSubmitting(true);
     const response = await fetch(`/api/supplier-products/${offerId}`, { method: "DELETE" });
@@ -66,12 +60,20 @@ export function OfferActions({ offerId, isActive }: { offerId: string; isActive:
       <button
         type="button"
         disabled={isSubmitting}
-        onClick={handleDelete}
+        onClick={() => setConfirmDeleteOpen(true)}
         className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-60"
       >
         Hapus Permanen
       </button>
       {error ? <p className="w-full text-xs text-red-600">{error}</p> : null}
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Hapus Penawaran"
+        message="Hapus penawaran ini secara PERMANEN? Data yang sudah dihapus tidak bisa dikembalikan."
+        onConfirm={handleDelete}
+        isBusy={isSubmitting}
+      />
     </div>
   );
 }

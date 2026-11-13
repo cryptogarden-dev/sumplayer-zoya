@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/Select";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { PhotoUploader } from "@/components/produk/PhotoUploader";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { deleteOrderConfirmMessage } from "@/components/pesanan/PesananList";
 import { formatRupiah } from "@/lib/format/currency";
 import { formatTanggalIndonesia } from "@/lib/format/date";
@@ -367,11 +368,11 @@ export function PesananWorkspace({
   /** Hapus permanen (docs/BACKLOG.md #5) - untuk DRAFT/DIBATALKAN dan
    * DITERIMA (yang terakhir membalikkan stok toko + menghapus penerimaan
    * barangnya, pesannya menyebut itu); status lain ditolak server
-   * dengan pesan yang ditampilkan lewat formError. */
+   * dengan pesan yang ditampilkan lewat formError. Konfirmasi memakai
+   * ConfirmDialog (bukan window.confirm yang auto-dismiss di browser). */
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
   async function handleDelete() {
-    if (!window.confirm(deleteOrderConfirmMessage(order.status))) {
-      return;
-    }
     setFormError(null);
     setIsBusy(true);
     const response = await fetch(`/api/purchase-orders/${order.id}`, { method: "DELETE" });
@@ -586,11 +587,20 @@ export function PesananWorkspace({
         {order.status === "DRAFT" ||
         order.status === "DIBATALKAN" ||
         order.status === "DITERIMA" ? (
-          <Button variant="danger" disabled={isBusy} onClick={handleDelete}>
+          <Button variant="danger" disabled={isBusy} onClick={() => setConfirmDeleteOpen(true)}>
             Hapus Pesanan Permanen
           </Button>
         ) : null}
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Hapus Pesanan Permanen"
+        message={deleteOrderConfirmMessage(order.status)}
+        onConfirm={handleDelete}
+        isBusy={isBusy}
+      />
 
       {order.status === "DIPESAN" ? (
         <Card>

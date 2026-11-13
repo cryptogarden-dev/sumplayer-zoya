@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 /**
  * Hapus supplier PERMANEN (docs/BACKLOG.md #5) - berbeda dari
@@ -15,16 +16,9 @@ export function SupplierDeleteButton({ supplierId }: { supplierId: string }) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   async function handleClick() {
-    if (
-      !window.confirm(
-        "Hapus supplier ini secara PERMANEN? Data yang sudah dihapus tidak bisa dikembalikan.",
-      )
-    ) {
-      return;
-    }
-
     setError(null);
     setIsSubmitting(true);
     const response = await fetch(`/api/suppliers/${supplierId}`, { method: "DELETE" });
@@ -42,10 +36,18 @@ export function SupplierDeleteButton({ supplierId }: { supplierId: string }) {
 
   return (
     <div>
-      <Button variant="danger" disabled={isSubmitting} onClick={handleClick}>
+      <Button variant="danger" disabled={isSubmitting} onClick={() => setConfirmDeleteOpen(true)}>
         {isSubmitting ? "Menghapus..." : "Hapus Supplier Permanen"}
       </Button>
       {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Hapus Supplier Permanen"
+        message="Hapus supplier ini secara PERMANEN? Data yang sudah dihapus tidak bisa dikembalikan."
+        onConfirm={handleClick}
+        isBusy={isSubmitting}
+      />
     </div>
   );
 }
