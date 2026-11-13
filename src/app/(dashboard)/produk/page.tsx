@@ -54,13 +54,10 @@ export default async function ProdukPage() {
       ) : (
         <ProductBrowser
           products={products.map((product) => {
-            const prices = product.supplierProducts
-              .map((offer) => offer.prices[0]?.pricePerPackage)
-              .filter((price): price is NonNullable<typeof price> => price != null)
-              .map((price) => Number(price));
-            const lowestPrice = prices.length > 0 ? Math.min(...prices) : null;
             // Harga beli termurah per satuan dasar + margin vs harga jual
             // (perbaikan #5) — dihitung dari penawaran aktif yang sama.
+            // Modal di kartu tampil per satuan dasar (bukan per kemasan)
+            // supaya sejajar dengan harga jual dan marginnya.
             const cheapestBuy = computeCheapestBuyPricePerBaseUnit(
               product.supplierProducts
                 .filter((offer) => offer.prices[0])
@@ -87,7 +84,6 @@ export default async function ProdukPage() {
               photoUrl: product.photoUrl,
               isActive: product.isActive,
               offerCount: product._count.supplierProducts,
-              lowestPrice,
               supplierIds: product.supplierProducts.map((offer) => offer.supplierId),
               stockQty: product.stockQty.toString(),
               lowStockThreshold: product.lowStockThreshold?.toString() ?? null,

@@ -33,11 +33,6 @@ export interface ProductCardData {
   photoUrl: string | null;
   isActive: boolean;
   offerCount: number;
-  /** Harga termurah dari semua penawaran supplier aktif, null kalau belum
-   * ada penawaran/harga sama sekali (permintaan pengguna 2026-08-21:
-   * pengganti tampilan SKU di kartu produk, lebih berguna gaya
-   * marketplace). */
-  lowestPrice: number | null;
   supplierIds: string[];
   category: { id: string; name: string } | null;
   /** Stok toko saat ini, dalam satuan dasar produk (R18). */
@@ -87,7 +82,7 @@ export function ProductCard({
       }}
       className="border-divider hover:border-cloud focus-visible:outline-slate flex h-full cursor-pointer flex-col overflow-hidden rounded-[20px] border bg-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
     >
-      <div className="bg-page relative m-2.5 mb-0 flex aspect-square items-center justify-center overflow-hidden rounded-[14px]">
+      <div className="bg-page relative m-2.5 mb-0 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-[14px]">
         {product.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- foto dari tautan bebas/Supabase Storage
           <img
@@ -95,7 +90,7 @@ export function ProductCard({
             alt={product.productName}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain p-3"
           />
         ) : (
           <span
@@ -131,31 +126,43 @@ export function ProductCard({
         ) : null}
         <h3 className="line-clamp-2 text-sm font-semibold text-slate-900">{product.productName}</h3>
         {subtitle ? <p className="line-clamp-1 text-xs text-slate-500">{subtitle}</p> : null}
-        {product.lowestPrice != null ? (
-          <p className="text-kunyit text-sm font-semibold">
-            Modal {formatRupiah(product.lowestPrice)}
-          </p>
-        ) : null}
-        {product.sellPricePerBaseUnit != null ? (
-          <p className="text-sm text-slate-600">
-            Jual {formatRupiah(Number(product.sellPricePerBaseUnit))}/
-            {BASE_UNIT_LABELS[product.baseUnit]}
-            {product.marginPercent != null ? (
-              <span
-                className={
-                  product.marginPercent < 0
-                    ? "font-medium text-red-600"
-                    : "font-medium text-emerald-600"
-                }
-              >
-                {" "}
-                · Margin{" "}
-                {new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(
-                  product.marginPercent,
-                )}
-                %
-              </span>
-            ) : null}
+        {/* Modal dan Jual berdampingan, keduanya per satuan dasar dengan
+            label satuannya (kg/pcs/liter) supaya 1 kg, 1/2 kg, dan 1/4 kg
+            langsung kebaca — bukan harga per kemasan tanpa satuan. */}
+        <div className="flex gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-slate-400">Modal</p>
+            <p className="truncate text-sm font-semibold text-slate-900">
+              {product.cheapestBuyPerBaseUnit != null
+                ? `${formatRupiah(product.cheapestBuyPerBaseUnit)}/${BASE_UNIT_LABELS[product.baseUnit]}`
+                : "—"}
+            </p>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-slate-400">Jual</p>
+            {product.sellPricePerBaseUnit != null ? (
+              <p className="text-kunyit truncate text-sm font-semibold">
+                {formatRupiah(Number(product.sellPricePerBaseUnit))}/
+                {BASE_UNIT_LABELS[product.baseUnit]}
+              </p>
+            ) : (
+              <p className="truncate text-sm text-slate-400">
+                — <span className="text-xs">belum diatur</span>
+              </p>
+            )}
+          </div>
+        </div>
+        {product.marginPercent != null ? (
+          <p
+            className={`text-xs font-medium ${
+              product.marginPercent < 0 ? "text-red-600" : "text-emerald-600"
+            }`}
+          >
+            Margin{" "}
+            {new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 }).format(
+              product.marginPercent,
+            )}
+            %
           </p>
         ) : null}
         <p className="text-xs text-slate-500">
