@@ -30,6 +30,44 @@ export interface ReceiptCompletenessInput {
   receivedQty: Decimal.Value;
 }
 
+/**
+ * Stok toko yang harus DIKURANGI saat pesanan yang sudah DITERIMA dihapus
+ * permanen: kebalikan dari `computeStockAddition` — jumlah yang dulu
+ * masuk stok dari penerimaan itu (kemasan baik x isi kemasan).
+ */
+export function computeStockReversal(
+  goodPackageQty: Decimal.Value,
+  totalPackageContent: Decimal.Value,
+): Decimal {
+  return computeStockAddition(goodPackageQty, totalPackageContent);
+}
+
+/**
+ * Stok toko setelah pembalikan penerimaan. Menolak bila stok saat ini
+ * kurang dari yang mau dikurangi — stok tidak boleh jadi negatif (mis.
+ * barang sudah terjual/dipakai setelah diterima).
+ */
+export function computeStockAfterReversal(
+  currentStockQty: Decimal.Value,
+  reversalQty: Decimal.Value,
+  productLabel?: string,
+): Decimal {
+  const current = new Decimal(currentStockQty);
+  const reversal = new Decimal(reversalQty);
+  if (reversal.isNegative()) {
+    throw new Error("Jumlah pembalikan stok tidak boleh negatif.");
+  }
+  const result = current.minus(reversal);
+  if (result.isNegative()) {
+    throw new Error(
+      `Stok toko${productLabel ? ` ${productLabel}` : ""} saat ini (${current.toString()}) ` +
+        `kurang dari yang mau dikurangi (${reversal.toString()}) — pesanan ini tidak bisa ` +
+        `dihapus permanen sebelum stoknya ditambah lagi.`,
+    );
+  }
+  return result;
+}
+
 export interface ReceiptCompletenessResult {
   /** `true` bila ada baris yang diterima kurang dari yang dipesan. */
   isPartial: boolean;

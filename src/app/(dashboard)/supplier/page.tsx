@@ -17,7 +17,10 @@ export const dynamic = "force-dynamic";
  */
 export default async function SupplierPage() {
   const session = await requireSession();
-  const suppliers = await listSuppliers(session.user.businessId);
+  // `includeInactive: true`: supplier nonaktif tetap tampil dengan
+  // badge "Nonaktif" (pola sama seperti daftar produk) supaya bisa
+  // diaktifkan/dihapus lagi — sebelumnya hilang total dari daftar.
+  const suppliers = await listSuppliers(session.user.businessId, { includeInactive: true });
 
   return (
     <div>

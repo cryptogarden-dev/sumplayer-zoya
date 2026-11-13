@@ -370,6 +370,32 @@ laporan produk yang "dihapus" masih muncul di sisi supplier.
   `pesanan/page.tsx`) dan halaman detail
   (`src/components/pesanan/PesananWorkspace.tsx`, tombol "Hapus Pesanan
   Permanen" di samping "Batalkan Pesanan").
+
+**Perluasan aturan hapus (2026-11-13, perbaikan #3):**
+
+- **Pesanan `DITERIMA` boleh dihapus permanen** — dalam satu transaksi
+  penerimaan barangnya ikut dihapus dan stok toko yang dulu ditambahkan
+  dari penerimaan itu dikurangi lagi (kemasan baik x isi kemasan,
+  `computeStockReversal`/`computeStockAfterReversal` di
+  `src/lib/domain/receiving/goods-receipt.ts`); bila stok saat ini kurang
+  dari yang mau dikurangi, hapus ditolak dengan pesan jelas. Kinerja
+  supplier direkomputasi ulang (`recomputeSupplierPerformance`, diekspor
+  dari `goods-receipt-repository`). `DIPESAN`/`DIKONFIRMASI`/`DIKIRIM`
+  tetap tidak bisa dihapus permanen — batalkan dulu (DRAFT/DIPESAN) atau
+  terima barangnya dulu (DIKONFIRMASI/DIKIRIM). Tombol hapus di daftar
+  dan detail pesanan kini tampil juga untuk `DITERIMA`, dengan pesan
+  konfirmasi yang menyebut pembalikan stoknya
+  (`deleteOrderConfirmMessage` di `PesananList.tsx`).
+- **Pesan penolakan hapus kini menyebut pemblokirnya:** `deleteProduct`
+  menyebut nomor pesanan + nama supplier (bila pernah dipesan) atau nama
+  supplier penawaran aktif; `deleteOffer` menyebut nomor pesanan;
+  `deleteSupplier` menyebut nomor pesanan atau nama produk penawarannya.
+  Aturan diperketat sesuai itu: produk diblokir juga bila masih punya
+  penawaran AKTIF, supplier diblokir bila masih punya penawaran apa pun
+  (aktif/nonaktif).
+- **Supplier nonaktif tetap tampil** di daftar (`includeInactive: true`
+  di `supplier/page.tsx`, badge "Nonaktif" sudah ada) — sebelumnya hilang
+  total, jadi tidak bisa diaktifkan/dihapus lagi.
 - **Tanggal di kartu Pesanan:** `PesananList.tsx` menampilkan
   `formatTanggalIndonesia(order.createdAt)` (helper yang sudah ada di
   `src/lib/format/date.ts`) di bawah jumlah produk.

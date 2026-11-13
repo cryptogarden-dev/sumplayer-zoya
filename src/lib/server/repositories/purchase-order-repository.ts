@@ -2,7 +2,12 @@ import "server-only";
 import { Decimal } from "decimal.js";
 import { prisma } from "@/lib/db/prisma";
 import { calculateSubtotal } from "@/lib/domain/pricing/subtotal";
+import {
+  computeStockAfterReversal,
+  computeStockReversal,
+} from "@/lib/domain/receiving/goods-receipt";
 import { getDefaultBusinessLocation } from "@/lib/server/repositories/business-location-repository";
+import { recomputeSupplierPerformance } from "@/lib/server/repositories/goods-receipt-repository";
 import type {
   CreatePurchaseOrderInput,
   PurchaseOrderItemAvailabilityInput,
@@ -383,22 +388,84 @@ export async function cancelPurchaseOrder(
 
 /**
  * Hapus PERMANEN satu pesanan (docs/BACKLOG.md #5, disepakati bersama
- * pengguna 2026-08-21). Hanya diizinkan untuk status `DRAFT` (belum pernah
- * dikirim ke supplier) atau `DIBATALKAN` (sudah dibatalkan dengan alasan
- * tercatat, R29). Pesanan yang sudah `DIPESAN`/`DIKONFIRMASI`/dst harus
- * dibatalkan terlebih dahulu lewat `cancelPurchaseOrder` sebelum bisa
- * dihapus - supaya selalu ada jejak kenapa pesanan itu tidak jadi.
+ * pengguna 2026-08-21; diperluas 2026-11-13 untuk status DITERIMA).
+ *
+ * DRAFT / DIBATALKAN: aman dihapus kapan saja (belum berefek nyata ke
+ * supplier/riwayat). DITERIMA: boleh dihapus, TAPI dalam satu transaksi
+ * penerimaan barangnya ikut dihapus dan stok toko yang dulu ditambahkan
+ * dari penerimaan itu DIKURANGI lagi (kemasan baik x isi kemasan) —
+ * supaya stok tidak menggelembung dari pesanan yang sudah tidak ada.
+ * Bila stok saat ini kurang dari yang mau dikurangi (mis. barang sudah
+ * terjual), hapus ditolak dengan pesan jelas. Kinerja supplier
+ * direkomputasi ulang dari sisa pesanan yang masih ada.
+ * DIPESAN / DIKONFIRMASI / DIKIRIM: tetap TIDAK bisa dihapus permanen —
+ * batalkan dulu (DRAFT/DIPESAN) atau terima barangnya dulu
+ * (DIKONFIRMASI/DIKIRIM), supaya selalu ada jejak kenapa pesanan itu
+ * tidak jadi.
  */
 export async function deletePurchaseOrder(businessId: string, orderId: string): Promise<boolean> {
   const order = await prisma.purchaseOrder.findFirst({ where: { id: orderId, businessId } });
   if (!order) return false;
-  if (order.status !== "DRAFT" && order.status !== "DIBATALKAN") {
+  if (order.status === "DIPESAN" || order.status === "DIKONFIRMASI" || order.status === "DIKIRIM") {
     throw new OrderStateError(
-      "Batalkan pesanan ini terlebih dahulu sebelum menghapusnya secara permanen.",
+      "Pesanan yang masih dipesan/dikonfirmasi/dikirim tidak bisa dihapus permanen. " +
+        "Batalkan dulu (dari DRAFT/DIPESAN) atau terima barangnya dulu (dari DIKONFIRMASI/DIKIRIM) " +
+        "sebelum menghapusnya.",
     );
   }
 
-  await prisma.purchaseOrder.delete({ where: { id: orderId } });
+  if (order.status !== "DITERIMA") {
+    await prisma.purchaseOrder.delete({ where: { id: orderId } });
+    return true;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const receipt = await tx.goodsReceipt.findFirst({
+      where: { purchaseOrderId: orderId, businessId },
+      include: {
+        items: {
+          include: {
+            purchaseOrderItem: {
+              include: {
+                supplierProduct: {
+                  select: { productId: true, totalPackageContent: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (receipt) {
+      for (const item of receipt.items) {
+        const reversal = computeStockReversal(
+          item.conditionGoodQty,
+          item.purchaseOrderItem.supplierProduct.totalPackageContent,
+        );
+        if (reversal.lte(0)) continue;
+        const product = await tx.product.findFirst({
+          where: { id: item.purchaseOrderItem.supplierProduct.productId, businessId },
+          select: { stockQty: true, productName: true, brand: true, variant: true },
+        });
+        if (!product) continue;
+        const productLabel = [product.productName, product.brand, product.variant]
+          .filter(Boolean)
+          .join(" ");
+        const newStock = computeStockAfterReversal(product.stockQty, reversal, productLabel);
+        await tx.product.update({
+          where: { id: item.purchaseOrderItem.supplierProduct.productId },
+          data: { stockQty: newStock },
+        });
+      }
+
+      await tx.goodsReceiptItem.deleteMany({ where: { goodsReceiptId: receipt.id } });
+      await tx.goodsReceipt.delete({ where: { id: receipt.id } });
+    }
+
+    await tx.purchaseOrder.delete({ where: { id: orderId } });
+    await recomputeSupplierPerformance(tx, businessId, order.supplierId);
+  });
   return true;
 }
 

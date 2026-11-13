@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/Select";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
 import { PhotoUploader } from "@/components/produk/PhotoUploader";
+import { deleteOrderConfirmMessage } from "@/components/pesanan/PesananList";
 import { formatRupiah } from "@/lib/format/currency";
 import { formatTanggalIndonesia } from "@/lib/format/date";
 import {
@@ -363,14 +364,12 @@ export function PesananWorkspace({
     });
   }
 
-  /** Hapus permanen (docs/BACKLOG.md #5) - hanya untuk DRAFT/DIBATALKAN,
-   * status lain ditolak server dengan pesan yang ditampilkan lewat formError. */
+  /** Hapus permanen (docs/BACKLOG.md #5) - untuk DRAFT/DIBATALKAN dan
+   * DITERIMA (yang terakhir membalikkan stok toko + menghapus penerimaan
+   * barangnya, pesannya menyebut itu); status lain ditolak server
+   * dengan pesan yang ditampilkan lewat formError. */
   async function handleDelete() {
-    if (
-      !window.confirm(
-        "Hapus pesanan ini secara PERMANEN? Data yang sudah dihapus tidak bisa dikembalikan.",
-      )
-    ) {
+    if (!window.confirm(deleteOrderConfirmMessage(order.status))) {
       return;
     }
     setFormError(null);
@@ -584,7 +583,9 @@ export function PesananWorkspace({
           </Button>
         ) : null}
 
-        {order.status === "DRAFT" || order.status === "DIBATALKAN" ? (
+        {order.status === "DRAFT" ||
+        order.status === "DIBATALKAN" ||
+        order.status === "DITERIMA" ? (
           <Button variant="danger" disabled={isBusy} onClick={handleDelete}>
             Hapus Pesanan Permanen
           </Button>

@@ -21,8 +21,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 /**
- * Hapus permanen (docs/BACKLOG.md #5, disepakati 2026-08-21). Hanya boleh
- * untuk status DRAFT/DIBATALKAN - `deletePurchaseOrder` melempar
+ * Hapus permanen (docs/BACKLOG.md #5, disepakati 2026-08-21; diperluas
+ * 2026-11-13 untuk DITERIMA). Boleh untuk status DRAFT/DIBATALKAN dan
+ * DITERIMA (yang terakhir membalikkan stok toko + menghapus penerimaan
+ * barangnya dalam satu transaksi) - `deletePurchaseOrder` melempar
  * `OrderStateError` (dipetakan `handleApiError` -> 400) untuk status lain.
  */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {

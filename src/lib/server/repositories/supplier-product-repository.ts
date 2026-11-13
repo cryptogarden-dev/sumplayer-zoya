@@ -308,12 +308,16 @@ export async function deleteOffer(businessId: string, id: string): Promise<boole
   const offer = await prisma.supplierProduct.findFirst({ where: { id, businessId } });
   if (!offer) return false;
 
-  const orderHistoryCount = await prisma.purchaseOrderItem.count({
+  const blockingOrderItem = await prisma.purchaseOrderItem.findFirst({
     where: { businessId, supplierProductId: id },
+    include: { purchaseOrder: { select: { orderNumber: true } } },
+    orderBy: { createdAt: "asc" },
   });
-  if (orderHistoryCount > 0) {
+  if (blockingOrderItem) {
     throw new DeletionBlockedError(
-      "Penawaran ini sudah pernah dipesan ke supplier, jadi tidak bisa dihapus permanen (supaya riwayat pesanan lama tidak rusak). Gunakan tombol Nonaktifkan.",
+      `Penawaran ini sudah dipakai di pesanan ${blockingOrderItem.purchaseOrder.orderNumber ?? "Draft"}, ` +
+        `jadi tidak bisa dihapus permanen (supaya riwayat pesanan lama tidak rusak). Hapus dulu ` +
+        `pesanan itu, atau gunakan tombol Nonaktifkan.`,
     );
   }
 

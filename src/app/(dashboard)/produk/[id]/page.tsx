@@ -110,7 +110,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         </div>
         <p className="-mt-4 text-xs text-slate-500">
           Nonaktifkan bisa diaktifkan lagi sewaktu-waktu. Hapus permanen hanya bisa dilakukan untuk
-          produk yang belum pernah dipesan ke supplier manapun.
+          produk yang belum pernah dipesan ke supplier manapun dan tidak punya penawaran aktif.
         </p>
 
         <div>

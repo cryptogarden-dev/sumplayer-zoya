@@ -150,20 +150,37 @@ export async function setSupplierActive(businessId: string, id: string, isActive
  * `deleteProduct`). Skema memakai `onDelete: Cascade` dari Supplier ->
  * SupplierProduct -> PurchaseOrderItem DAN Supplier -> PurchaseOrder
  * langsung, jadi hapus permanen supplier bisa merusak riwayat pesanan lama
- * kalau tidak dijaga - ditolak dengan `DeletionBlockedError` jika supplier
- * ini pernah dipakai di baris pesanan manapun. Gunakan `setSupplierActive`
- * (nonaktifkan) untuk kasus itu.
+ * kalau tidak dijaga - ditolak dengan `DeletionBlockedError` yang
+ * menyebut nomor pesanan / nama produk pemblokirnya jika supplier ini
+ * pernah dipakai di baris pesanan manapun ATAU masih punya penawaran.
+ * Gunakan `setSupplierActive` (nonaktifkan) untuk kasus itu.
  */
 export async function deleteSupplier(businessId: string, id: string): Promise<boolean> {
   const supplier = await prisma.supplier.findFirst({ where: { id, businessId } });
   if (!supplier) return false;
 
-  const orderHistoryCount = await prisma.purchaseOrderItem.count({
+  const blockingOrderItem = await prisma.purchaseOrderItem.findFirst({
     where: { businessId, supplierProduct: { supplierId: id } },
+    include: { purchaseOrder: { select: { orderNumber: true } } },
+    orderBy: { createdAt: "asc" },
   });
-  if (orderHistoryCount > 0) {
+  if (blockingOrderItem) {
     throw new DeletionBlockedError(
-      "Supplier ini sudah pernah dipesan, jadi tidak bisa dihapus permanen (supaya riwayat pesanan lama tidak rusak). Gunakan tombol Nonaktifkan.",
+      `Supplier ini sudah dipakai di pesanan ${blockingOrderItem.purchaseOrder.orderNumber ?? "Draft"}, ` +
+        `jadi tidak bisa dihapus permanen (supaya riwayat pesanan lama tidak rusak). Hapus dulu ` +
+        `pesanan itu, atau gunakan tombol Nonaktifkan.`,
+    );
+  }
+
+  const blockingOffer = await prisma.supplierProduct.findFirst({
+    where: { businessId, supplierId: id },
+    include: { product: { select: { productName: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  if (blockingOffer) {
+    throw new DeletionBlockedError(
+      `Supplier ini masih punya penawaran untuk produk ${blockingOffer.product.productName}, jadi ` +
+        `tidak bisa dihapus permanen. Hapus dulu penawarannya, atau gunakan tombol Nonaktifkan.`,
     );
   }
 

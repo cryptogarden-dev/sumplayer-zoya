@@ -72,7 +72,7 @@ export default async function SupplierDetailPage({ params }: SupplierDetailPageP
         </div>
         <p className="-mt-4 text-xs text-slate-500">
           Nonaktifkan bisa diaktifkan lagi sewaktu-waktu. Hapus permanen hanya bisa dilakukan untuk
-          supplier yang belum pernah dipesan.
+          supplier yang belum pernah dipesan dan tidak punya penawaran.
         </p>
 
         <div>

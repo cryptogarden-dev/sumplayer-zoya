@@ -222,8 +222,12 @@ export async function createGoodsReceipt(
  * (`purchase_orders` DITERIMA + `goods_receipts` on_time) — bukan dari
  * nilai lama yang ditambah-tambah. Rumus rate memakai Laplace smoothing
  * yang sama dengan `estimateOnTimeRate` (R15).
+ *
+ * Diekspor karena dipakai juga oleh `deletePurchaseOrder`
+ * (purchase-order-repository): setelah pesanan DITERIMA dihapus, kinerja
+ * supplier itu harus dihitung ulang dari sisa pesanan yang masih ada.
  */
-async function recomputeSupplierPerformance(
+export async function recomputeSupplierPerformance(
   tx: Prisma.TransactionClient,
   businessId: string,
   supplierId: string,

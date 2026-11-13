@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   computeReceiptCompleteness,
   computeStockAddition,
+  computeStockAfterReversal,
+  computeStockReversal,
 } from "@/lib/domain/receiving/goods-receipt";
 
 describe("computeStockAddition (R18)", () => {
@@ -49,5 +51,33 @@ describe("computeReceiptCompleteness (R18)", () => {
     const result = computeReceiptCompleteness([{ orderedQty: 2, receivedQty: 0 }]);
     expect(result.isPartial).toBe(true);
     expect(result.overallCompleteness).toBe("KURANG");
+  });
+});
+
+describe("computeStockReversal + computeStockAfterReversal (hapus pesanan DITERIMA)", () => {
+  it("pembalikan = kemasan baik x isi kemasan (kebalikan penerimaan)", () => {
+    // PO-2026-0001: 2 karung baik x 5 kg/karung = 10 kg harus dikurangi.
+    expect(computeStockReversal(2, 5).toNumber()).toBe(10);
+  });
+
+  it("stok 10 kg dikurangi 10 kg jadi 0 (kasus audit Beras Audit)", () => {
+    expect(computeStockAfterReversal(10, computeStockReversal(2, 5)).toNumber()).toBe(0);
+  });
+
+  it("stok berkurang sebagian bila hanya sebagian barang yang baik", () => {
+    // Diterima 2 karung, baik 1, rusak 1: hanya 1 x 5 kg yang dulu masuk stok.
+    expect(computeStockAfterReversal(12, computeStockReversal(1, 5)).toNumber()).toBe(7);
+  });
+
+  it("menolak bila stok saat ini kurang dari yang mau dikurangi (tidak boleh negatif)", () => {
+    // Barang sudah terjual/dipakai: stok tinggal 4 kg, mau dikurangi 10 kg.
+    expect(() => computeStockAfterReversal(4, 10, "Beras Audit")).toThrow(
+      /kurang dari yang mau dikurangi/,
+    );
+  });
+
+  it("menolak pembalikan negatif", () => {
+    expect(() => computeStockAfterReversal(10, -1)).toThrow();
+    expect(() => computeStockReversal(-1, 5)).toThrow();
   });
 });

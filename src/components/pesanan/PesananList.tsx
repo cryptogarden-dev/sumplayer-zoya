@@ -18,10 +18,26 @@ const STATUS_COLOR: Record<string, string> = {
   DIBATALKAN: "text-red-600",
 };
 
-/** Status yang boleh dihapus permanen langsung (docs/BACKLOG.md #5) - yang
- * lain (DIPESAN/DIKONFIRMASI/dst) harus dibatalkan dulu lewat halaman
- * detail pesanan, baru bisa dihapus. */
-const DELETABLE_STATUSES = new Set(["DRAFT", "DIBATALKAN"]);
+/** Status yang boleh dihapus permanen langsung (docs/BACKLOG.md #5) -
+ * DRAFT/DIBATALKAN kapan saja, DITERIMA juga boleh (stok toko yang dulu
+ * ditambahkan dari pesanan itu dikurangi lagi). Yang lain
+ * (DIPESAN/DIKONFIRMASI/DIKIRIM) harus dibatalkan dulu (DRAFT/DIPESAN)
+ * atau diterima dulu (DIKONFIRMASI/DIKIRIM) lewat halaman detail
+ * pesanan, baru bisa dihapus. */
+const DELETABLE_STATUSES = new Set(["DRAFT", "DIBATALKAN", "DITERIMA"]);
+
+/** Pesan konfirmasi hapus — untuk DITERIMA disebut juga konsekuensinya
+ * ke stok toko, supaya tidak kaget stoknya berkurang. */
+export function deleteOrderConfirmMessage(status: string): string {
+  if (status === "DITERIMA") {
+    return (
+      "Hapus pesanan ini secara PERMANEN? Stok toko yang dulu ditambahkan dari pesanan ini " +
+      "akan dikurangi lagi, dan catatan penerimaan barangnya ikut terhapus. " +
+      "Data yang sudah dihapus tidak bisa dikembalikan."
+    );
+  }
+  return "Hapus pesanan ini secara PERMANEN? Data yang sudah dihapus tidak bisa dikembalikan.";
+}
 
 export interface PesananListItem {
   id: string;
@@ -57,11 +73,7 @@ function PesananListCard({ order }: { order: PesananListItem }) {
   async function handleDelete(event: MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
-    if (
-      !window.confirm(
-        "Hapus pesanan ini secara PERMANEN? Data yang sudah dihapus tidak bisa dikembalikan.",
-      )
-    ) {
+    if (!window.confirm(deleteOrderConfirmMessage(order.status))) {
       return;
     }
 
