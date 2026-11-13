@@ -24,7 +24,11 @@ export function AppShell({
   return (
     <div className="flex min-h-dvh flex-col lg:flex-row">
       <Sidebar />
-      <div className="flex min-h-dvh flex-1 flex-col">
+      {/* min-w-0: tanpa ini, item flex tidak mau mengecil di bawah lebar
+          minimum kontennya (R24) — grid 4 kolom di halaman Produk
+          mendorong seluruh halaman lebih lebar dari viewport sehingga
+          kolom ke-4 terpotong dan muncul horizontal scroll. */}
+      <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
         <Header session={session} cartCount={cartCount} />
         <main className="flex-1 px-4 pt-6 pb-24 sm:px-6 lg:px-10 lg:pt-8 lg:pb-8">{children}</main>
       </div>
