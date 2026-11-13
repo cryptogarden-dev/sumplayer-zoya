@@ -7,8 +7,10 @@ import type { Money } from "@/lib/domain/money/money";
  * memanggil fungsi ini.
  *
  * Aturan: urut kronologis menaik dulu untuk menghitung perubahan vs
- * entri sebelumnya dari PENAWARAN YANG SAMA (supplier + kemasan yang
- * sama); baris pertama tiap penawaran tidak punya pembanding
+ * entri sebelumnya dari PRODUK YANG SAMA (semua entri di sini memang
+ * sudah milik satu produk — tidak peduli penawarannya berbeda atau
+ * sumbernya Penawaran vs Pembelian); hanya baris paling awal dalam
+ * seluruh riwayat produk itu yang tidak punya pembanding
  * (`change: null`). Hasil akhir diurutkan terbaru dulu.
  */
 export interface PriceHistoryEntryBase {
@@ -27,16 +29,15 @@ export function attachPriceHistoryChanges<T extends PriceHistoryEntryBase>(
     return a.source === b.source ? 0 : a.source === "PENAWARAN" ? -1 : 1;
   });
 
-  const lastByOffer = new Map<string, PriceHistoryEntryBase>();
+  let previous: PriceHistoryEntryBase | null = null;
   const withChange = sorted.map((entry) => {
-    const previous = lastByOffer.get(entry.supplierProductId);
     const change = previous
       ? calculatePriceChange({
           oldPrice: previous.pricePerBaseUnit,
           newPrice: entry.pricePerBaseUnit,
         })
       : null;
-    lastByOffer.set(entry.supplierProductId, entry);
+    previous = entry;
     return { ...entry, change };
   });
 

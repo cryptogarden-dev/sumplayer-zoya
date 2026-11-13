@@ -20,9 +20,10 @@ import type { BaseUnit, MeasurementUnit, PackagingType } from "@generated/prisma
  *
  * Harga per satuan dasar dihitung SETELAH pajak (sama seperti Bandingkan)
  * agar bisa dibandingkan antar kemasan/supplier. Perubahan dihitung vs
- * entri sebelumnya dari PENAWARAN YANG SAMA (supplier + kemasan yang
- * sama) — bukan vs baris mana pun, supaya naik/turunnya bermakna.
- * Baris pertama tiap penawaran tidak punya pembanding (`change: null`).
+ * entri sebelumnya dari PRODUK YANG SAMA secara kronologis (tidak
+ * peduli penawarannya berbeda atau sumbernya Penawaran vs Pembelian) —
+ * hanya baris paling awal dalam seluruh riwayat yang tidak punya
+ * pembanding (`change: null`).
  * Logika urut + perubahan ada di `src/lib/domain/pricing/price-history.ts`
  * (fungsi murni, diuji unit) — repository ini hanya mengambil data mentah.
  */
@@ -47,7 +48,7 @@ export interface PriceHistoryRow {
   pricePerPackage: Decimal;
   /** Harga per satuan dasar SETELAH pajak. */
   pricePerBaseUnit: Money;
-  /** Perubahan vs entri sebelumnya dari penawaran yang sama. */
+  /** Perubahan vs entri sebelumnya dari produk yang sama. */
   change: PriceChangeResult | null;
 }
 
@@ -164,7 +165,7 @@ export async function listPurchasePriceHistory(
     });
   }
 
-  // Urut kronologis + perubahan vs entri sebelumnya dari penawaran yang
+  // Urut kronologis + perubahan vs entri sebelumnya dari produk yang
   // sama dihitung oleh fungsi murni (lihat price-history.ts); hasil
   // akhirnya terbaru dulu.
   return attachPriceHistoryChanges(rows);

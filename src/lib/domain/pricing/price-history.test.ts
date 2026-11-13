@@ -46,13 +46,29 @@ describe("attachPriceHistoryChanges", () => {
     expect(rows[1]!.change).toBeNull();
   });
 
-  it("penawaran yang berbeda tidak saling jadi pembanding", () => {
+  it("penawaran yang berbeda untuk produk yang sama saling jadi pembanding", () => {
+    // Kasus live Beras Tes (2026-11-13): penawaran baru Rp65.000
+    // (Rp13.000/kg) dibuat sebagai baris penawaran baru, bukan edit
+    // penawaran lama Rp60.000 (Rp12.000/kg) — perubahannya harus tetap
+    // tampil naik Rp1.000/kg, bukan "—".
     const rows = attachPriceHistoryChanges([
-      entry("2026-11-12", "offer-b", 15000),
+      entry("2026-11-13", "offer-b", 13000),
       entry("2026-11-10", "offer-a", 12000),
     ]);
-    // Keduanya baris pertama untuk penawarannya masing-masing.
-    expect(rows[0]!.change).toBeNull();
+    expect(rows[0]!.change?.direction).toBe("NAIK");
+    expect(rows[0]!.change?.amountChange.toNumber()).toBe(1000);
+    expect(rows[0]!.change?.percentChange?.toNumber()).toBeCloseTo(8.333333, 4);
+    // Hanya baris paling awal dalam seluruh riwayat yang tanpa pembanding.
+    expect(rows[1]!.change).toBeNull();
+  });
+
+  it("pembelian dibandingkan dengan entri sebelumnya walau penawarannya berbeda", () => {
+    const rows = attachPriceHistoryChanges([
+      entry("2026-11-12", "offer-b", 12500, "PEMBELIAN"),
+      entry("2026-11-10", "offer-a", 12000, "PENAWARAN"),
+    ]);
+    expect(rows[0]!.change?.direction).toBe("NAIK");
+    expect(rows[0]!.change?.amountChange.toNumber()).toBe(500);
     expect(rows[1]!.change).toBeNull();
   });
 
