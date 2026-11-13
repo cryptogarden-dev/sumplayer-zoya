@@ -21,6 +21,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       session.user.businessId,
       id,
       parsed.data.paymentMethod,
+      parsed.data.paymentDueDate ? new Date(`${parsed.data.paymentDueDate}T00:00:00`) : undefined,
     );
     if (!order) {
       throw new ApiError(404, "Pesanan tidak ditemukan.");

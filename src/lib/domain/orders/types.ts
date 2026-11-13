@@ -26,6 +26,10 @@ export const PURCHASE_ORDER_ITEM_AVAILABILITIES = [
 ] as const;
 export type PurchaseOrderItemAvailability = (typeof PURCHASE_ORDER_ITEM_AVAILABILITIES)[number];
 
-/** Metode konfirmasi pembayaran (pencatatan pilihan saja, bukan payment gateway). */
-export const PAYMENT_METHODS = ["TUNAI", "TRANSFER"] as const;
+/** Metode konfirmasi pembayaran (pencatatan pilihan saja, bukan payment gateway). TEMPO = bayar belakangan sampai tanggal jatuh tempo. */
+export const PAYMENT_METHODS = ["TUNAI", "TRANSFER", "TEMPO"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+/** Status pembayaran pesanan (perbaikan #4): belum ada yang dibayar, DP (sebagian), atau lunas. */
+export const PAYMENT_STATUSES = ["BELUM_BAYAR", "DP", "LUNAS"] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];

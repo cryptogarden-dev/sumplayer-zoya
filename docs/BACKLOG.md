@@ -167,7 +167,10 @@ di `docs/SPEC.md` (R16/R17) — lihat catatan revisi di
    oleh pengguna setelah membaca balasan WhatsApp supplier: Belum
    Dikonfirmasi / Tersedia / Sebagian (dengan jumlah terkonfirmasi) /
    Tidak Tersedia.
-4. Konfirmasi final memilih metode bayar: Tunai atau Transfer.
+4. Konfirmasi final memilih metode bayar: Tunai, Transfer, atau Tempo
+   (Tempo = bayar belakangan sampai tanggal jatuh tempo; ditambah
+   perbaikan #4, 2026-11-13, beserta status bayar Belum Bayar/DP/Lunas
+   dan pencatatan pembayaran).
 5. Mulai pesanan bisa dari halaman Supplier langsung ATAU dari
    Bandingkan (disepakati keduanya boleh) — baru halaman Supplier yang
    dibangun pada sesi ini (lihat "Belum dikerjakan").

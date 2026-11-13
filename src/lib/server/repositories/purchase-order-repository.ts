@@ -14,6 +14,7 @@ import type {
   PurchaseOrderItemInput,
 } from "@/lib/validation/purchase-order";
 import type { PaymentMethod } from "@/lib/domain/orders/types";
+import { computePaymentStatus } from "@/lib/domain/orders/payment";
 import type { Prisma } from "@generated/prisma/client";
 
 /**
@@ -342,6 +343,7 @@ export async function confirmPurchaseOrder(
   businessId: string,
   orderId: string,
   paymentMethod: PaymentMethod,
+  paymentDueDate?: Date,
 ) {
   return prisma.$transaction(async (tx) => {
     const order = await tx.purchaseOrder.findFirst({
@@ -352,6 +354,9 @@ export async function confirmPurchaseOrder(
     if (order.status !== "DIPESAN") {
       throw new OrderStateError("Hanya pesanan yang sudah dikirim yang bisa dikonfirmasi.");
     }
+    if (paymentMethod === "TEMPO" && !paymentDueDate) {
+      throw new OrderStateError("Tanggal jatuh tempo wajib diisi untuk cara bayar Tempo.");
+    }
     const belumDikonfirmasi = order.items.some(
       (item) => item.availabilityStatus === "BELUM_DIKONFIRMASI",
     );
@@ -361,7 +366,59 @@ export async function confirmPurchaseOrder(
 
     return tx.purchaseOrder.update({
       where: { id: orderId },
-      data: { status: "DIKONFIRMASI", paymentMethod, confirmedAt: new Date() },
+      data: {
+        status: "DIKONFIRMASI",
+        paymentMethod,
+        paymentDueDate: paymentMethod === "TEMPO" ? (paymentDueDate ?? null) : null,
+        confirmedAt: new Date(),
+      },
+      include: ORDER_DETAIL_INCLUDE,
+    });
+  });
+}
+
+/**
+ * Catat pembayaran untuk pesanan yang sudah dikonfirmasi (perbaikan #4).
+ * Hanya untuk status DIKONFIRMASI/DIKIRIM/DITERIMA — sebelum konfirmasi
+ * belum ada cara bayar yang dipilih. Jumlah dicatat kumulatif di
+ * `paidAmount`; status bayar diturunkan dari total pesanan (dihitung
+ * server dari baris, bukan dari klien): sebagian = DP, >= total = LUNAS.
+ * Pembayaran yang melebihi sisa tagihan ditolak.
+ */
+export async function recordPayment(businessId: string, orderId: string, amount: Decimal.Value) {
+  const paid = new Decimal(amount);
+  if (paid.lte(0)) {
+    throw new Error("Jumlah pembayaran harus lebih dari nol.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.purchaseOrder.findFirst({
+      where: { id: orderId, businessId },
+      include: ORDER_DETAIL_INCLUDE,
+    });
+    if (!order) return null;
+    if (
+      order.status !== "DIKONFIRMASI" &&
+      order.status !== "DIKIRIM" &&
+      order.status !== "DITERIMA"
+    ) {
+      throw new OrderStateError("Pembayaran hanya bisa dicatat setelah pesanan dikonfirmasi.");
+    }
+
+    const total = computeOrderTotal(order);
+    const newPaidAmount = new Decimal(order.paidAmount).plus(paid);
+    if (newPaidAmount.gt(total)) {
+      throw new Error(
+        `Jumlah pembayaran melebihi sisa tagihan (sisa Rp${total.minus(order.paidAmount).toString()}).`,
+      );
+    }
+
+    return tx.purchaseOrder.update({
+      where: { id: orderId },
+      data: {
+        paidAmount: newPaidAmount,
+        paymentStatus: computePaymentStatus(newPaidAmount, total),
+      },
       include: ORDER_DETAIL_INCLUDE,
     });
   });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildWhatsAppLink,
   formatWhatsAppOrderMessage,
+  formatWhatsAppPurchaseOrderMessage,
   toWhatsAppDigits,
 } from "@/lib/domain/whatsapp/format-order";
 
@@ -93,5 +94,42 @@ describe("buildWhatsAppLink", () => {
   it("membangun tautan wa.me dengan teks ter-encode", () => {
     const link = buildWhatsAppLink("081234567890", "Halo dunia");
     expect(link).toBe("https://wa.me/6281234567890?text=Halo%20dunia");
+  });
+});
+
+describe("formatWhatsAppPurchaseOrderMessage — info pembayaran (perbaikan #4)", () => {
+  const base = {
+    supplierName: "Supplier Audit",
+    items: [{ productName: "Beras Audit", quantityLabel: "2 Karung" }],
+  };
+
+  it("tanpa info bayar -> tidak ada baris Pembayaran", () => {
+    const message = formatWhatsAppPurchaseOrderMessage(base);
+    expect(message).not.toContain("Pembayaran:");
+  });
+
+  it("Transfer DP -> 'Pembayaran: Transfer (DP) — sudah dibayar Rp50.000 dari Rp120.000'", () => {
+    const message = formatWhatsAppPurchaseOrderMessage({
+      ...base,
+      paymentMethodLabel: "Transfer",
+      paymentStatusLabel: "DP",
+      paidAmount: 50000,
+      orderTotal: 120000,
+    });
+    expect(message).toContain(
+      "Pembayaran: Transfer (DP) — sudah dibayar Rp\u00A050.000 dari Rp\u00A0120.000",
+    );
+  });
+
+  it("Tempo belum dibayar -> hanya cara bayar + status, tanpa jumlah", () => {
+    const message = formatWhatsAppPurchaseOrderMessage({
+      ...base,
+      paymentMethodLabel: "Tempo",
+      paymentStatusLabel: "Belum Bayar",
+      paidAmount: 0,
+      orderTotal: 120000,
+    });
+    expect(message).toContain("Pembayaran: Tempo (Belum Bayar)");
+    expect(message).not.toContain("sudah dibayar");
   });
 });

@@ -15,11 +15,16 @@ import { formatRupiah } from "@/lib/format/currency";
 import { formatTanggalIndonesia } from "@/lib/format/date";
 import {
   PAYMENT_METHOD_LABELS,
+  PAYMENT_STATUS_LABELS,
   PURCHASE_ORDER_ITEM_AVAILABILITY_LABELS,
   PURCHASE_ORDER_STATUS_LABELS,
 } from "@/lib/format/orders";
 import { PAYMENT_METHODS, PURCHASE_ORDER_ITEM_AVAILABILITIES } from "@/lib/domain/orders/types";
-import type { PaymentMethod, PurchaseOrderItemAvailability } from "@/lib/domain/orders/types";
+import type {
+  PaymentMethod,
+  PaymentStatus,
+  PurchaseOrderItemAvailability,
+} from "@/lib/domain/orders/types";
 import type { BaseUnit } from "@/lib/domain/units/types";
 import { BASE_UNIT_LABELS } from "@/lib/format/units";
 import {
@@ -85,6 +90,10 @@ interface OrderView {
   notes: string | null;
   cancelReason: string | null;
   paymentMethod: PaymentMethod | null;
+  /** Status + jumlah bayar (perbaikan #4); `paymentDueDate` hanya untuk TEMPO. */
+  paymentStatus: PaymentStatus;
+  paidAmount: string;
+  paymentDueDate: string | null;
   items: OrderItemView[];
 }
 
@@ -196,6 +205,11 @@ export function PesananWorkspace({
 
   // Form konfirmasi
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("TUNAI");
+  const [paymentDueDate, setPaymentDueDate] = useState("");
+
+  // Form catat pembayaran (perbaikan #4)
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const remainingAmount = Math.max(Number(orderTotal) - Number(order.paidAmount), 0);
 
   async function callApi(url: string, method: string, body?: unknown) {
     setFormError(null);
@@ -247,6 +261,12 @@ export function PesananWorkspace({
         variant: item.variant,
         quantityLabel: quantityLabelForItem(item),
       })),
+      // Info bayar hanya ada setelah konfirmasi (perbaikan #4) — saat
+      // kirim pertama (DRAFT) cara bayar belum dipilih, baris ini absen.
+      paymentMethodLabel: order.paymentMethod ? PAYMENT_METHOD_LABELS[order.paymentMethod] : null,
+      paymentStatusLabel: order.paymentMethod ? PAYMENT_STATUS_LABELS[order.paymentStatus] : null,
+      paidAmount: order.paymentMethod ? order.paidAmount : null,
+      orderTotal: order.paymentMethod ? orderTotal : null,
     });
     try {
       return buildWhatsAppLink(phone, message);
@@ -286,7 +306,30 @@ export function PesananWorkspace({
   }
 
   async function handleConfirm() {
-    await callApi(`/api/purchase-orders/${order.id}/confirm`, "PATCH", { paymentMethod });
+    if (paymentMethod === "TEMPO" && !paymentDueDate) {
+      setFormError("Tanggal jatuh tempo wajib diisi untuk cara bayar Tempo.");
+      return;
+    }
+    await callApi(`/api/purchase-orders/${order.id}/confirm`, "PATCH", {
+      paymentMethod,
+      paymentDueDate: paymentMethod === "TEMPO" ? paymentDueDate : undefined,
+    });
+  }
+
+  async function handleRecordPayment() {
+    const amount = Number(paymentAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setFormError("Jumlah pembayaran harus lebih dari nol.");
+      return;
+    }
+    if (amount > remainingAmount) {
+      setFormError(
+        `Jumlah pembayaran melebihi sisa tagihan (sisa ${formatRupiah(remainingAmount)}).`,
+      );
+      return;
+    }
+    const ok = await callApi(`/api/purchase-orders/${order.id}/payment`, "POST", { amount });
+    if (ok) setPaymentAmount("");
   }
 
   async function handleCancel() {
@@ -406,6 +449,14 @@ export function PesananWorkspace({
         {order.paymentMethod ? (
           <p className="mt-1 text-sm text-emerald-700">
             Metode bayar: {PAYMENT_METHOD_LABELS[order.paymentMethod]}
+            {" · "}
+            Status bayar: {PAYMENT_STATUS_LABELS[order.paymentStatus]}
+            {Number(order.paidAmount) > 0
+              ? ` — sudah dibayar ${formatRupiah(Number(order.paidAmount))} dari ${formatRupiah(Number(orderTotal))}`
+              : ""}
+            {order.paymentMethod === "TEMPO" && order.paymentDueDate
+              ? ` · Jatuh tempo: ${formatTanggalIndonesia(order.paymentDueDate)}`
+              : ""}
           </p>
         ) : null}
       </Card>
@@ -569,13 +620,17 @@ export function PesananWorkspace({
           </Button>
         ) : null}
 
-        {order.status === "DIPESAN" && link ? (
-          <Button
-            variant="secondary"
-            onClick={() => window.open(link, "_blank", "noopener,noreferrer")}
-          >
-            Buka WhatsApp Lagi
-          </Button>
+        {order.status === "DIPESAN" ||
+        order.status === "DIKONFIRMASI" ||
+        order.status === "DIKIRIM" ? (
+          link ? (
+            <Button
+              variant="secondary"
+              onClick={() => window.open(link, "_blank", "noopener,noreferrer")}
+            >
+              Buka WhatsApp Lagi
+            </Button>
+          ) : null
         ) : null}
 
         {(order.status === "DRAFT" || order.status === "DIPESAN") && !showCancelForm ? (
@@ -624,9 +679,56 @@ export function PesananWorkspace({
               </label>
             ))}
           </div>
+          {paymentMethod === "TEMPO" ? (
+            <div className="mb-3">
+              <Label htmlFor="paymentDueDate">Tanggal jatuh tempo</Label>
+              <Input
+                id="paymentDueDate"
+                type="date"
+                value={paymentDueDate}
+                onChange={(event) => setPaymentDueDate(event.target.value)}
+                className="w-48"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Bayar belakangan sampai tanggal ini. Tanpa tanggal, pesanan tidak bisa dikonfirmasi.
+              </p>
+            </div>
+          ) : null}
           <Button disabled={isBusy || !allMarked} onClick={handleConfirm}>
             Konfirmasi Pesanan
           </Button>
+        </Card>
+      ) : null}
+
+      {(order.status === "DIKONFIRMASI" ||
+        order.status === "DIKIRIM" ||
+        order.status === "DITERIMA") &&
+      order.paymentStatus !== "LUNAS" ? (
+        <Card>
+          <h2 className="mb-1 text-base font-semibold text-slate-900">Catat Pembayaran</h2>
+          <p className="mb-3 text-sm text-slate-500">
+            Sisa tagihan: {formatRupiah(remainingAmount)} dari total{" "}
+            {formatRupiah(Number(orderTotal))}. Bila jumlah yang dicatat mencapai total, status
+            bayar otomatis jadi Lunas.
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <Label htmlFor="paymentAmount">Jumlah dibayar (Rp)</Label>
+              <Input
+                id="paymentAmount"
+                type="number"
+                min="0"
+                step="any"
+                placeholder="Rp"
+                value={paymentAmount}
+                onChange={(event) => setPaymentAmount(event.target.value)}
+                className="w-48"
+              />
+            </div>
+            <Button disabled={isBusy} onClick={handleRecordPayment}>
+              Catat Pembayaran
+            </Button>
+          </div>
         </Card>
       ) : null}
 

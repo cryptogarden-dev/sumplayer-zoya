@@ -575,10 +575,21 @@ enum PurchaseOrderItemAvailability {
 }
 
 /// Metode konfirmasi pembayaran. Pencatatan pilihan saja (tunai/transfer),
-/// BUKAN integrasi payment gateway.
+/// BUKAN integrasi payment gateway. TEMPO = bayar belakangan sampai
+/// tanggal jatuh tempo (`payment_due_date`, wajib diisi bila TEMPO).
 enum PaymentMethod {
   TUNAI
   TRANSFER
+  TEMPO
+}
+
+/// Status pembayaran pesanan (perbaikan #4). `paidAmount` mengejar
+/// total pesanan (dihitung on-the-fly dari baris, bukan disimpan):
+/// 0 = BELUM_BAYAR, sebagian = DP, >= total = LUNAS.
+enum PaymentStatus {
+  BELUM_BAYAR
+  DP
+  LUNAS
 }
 
 /// Pesanan ke SATU supplier, berisi banyak baris produk (R16). Satu
@@ -596,6 +607,13 @@ model PurchaseOrder {
   locationId    String?             @map("location_id") @db.Uuid
   status        PurchaseOrderStatus @default(DRAFT)
   paymentMethod PaymentMethod?      @map("payment_method")
+  /// Status + jumlah yang sudah dibayar (perbaikan #4). `paidAmount`
+  /// tidak boleh melebihi total pesanan (ditegakkan di service layer).
+  paymentStatus PaymentStatus     @default(BELUM_BAYAR) @map("payment_status")
+  paidAmount    Decimal           @default(0) @map("paid_amount") @db.Decimal(18, 2)
+  /// Wajib diisi bila `paymentMethod = TEMPO` (ditegakkan di validasi Zod
+  /// + service layer); NULL untuk TUNAI/TRANSFER.
+  paymentDueDate DateTime?        @map("payment_due_date")
   notes         String?
   /// NOT NULL bila status = DIBATALKAN (di-enforce di service layer, R29).
   cancelReason  String?             @map("cancel_reason")

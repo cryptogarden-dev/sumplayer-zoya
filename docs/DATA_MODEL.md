@@ -387,6 +387,11 @@ R16.
 > timestamptz. Alur saat ini BERHENTI di `DIKONFIRMASI` - transisi ke
 > `DIKIRIM`/`DITERIMA` menyusul bersama R18 (`goods_receipts`, belum
 > dikerjakan).
+>
+> Tambahan perbaikan #4 (2026-11-13): `payment_method` tambah nilai
+> `TEMPO`, plus kolom baru `payment_status` enum
+> (`BELUM_BAYAR`/`DP`/`LUNAS`), `paid_amount` numeric(18,2) default 0,
+> dan `payment_due_date` (wajib bila TEMPO).
 
 | Kolom                              | Tipe                                                      | Constraint                                                              |
 | ---------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------- |

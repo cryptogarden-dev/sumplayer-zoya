@@ -7,6 +7,7 @@ import { BackLink } from "@/components/ui/BackLink";
 import { SupplierEditForm } from "@/components/supplier/SupplierEditForm";
 import { SupplierStatusButton } from "@/components/supplier/SupplierStatusButton";
 import { SupplierDeleteButton } from "@/components/supplier/SupplierDeleteButton";
+import { ShippingRuleForm } from "@/components/supplier/ShippingRuleForm";
 import { CreateOrderButton } from "@/components/supplier/CreateOrderButton";
 
 export const metadata: Metadata = { title: "Detail Supplier" };
@@ -74,6 +75,8 @@ export default async function SupplierDetailPage({ params }: SupplierDetailPageP
           Nonaktifkan bisa diaktifkan lagi sewaktu-waktu. Hapus permanen hanya bisa dilakukan untuk
           supplier yang belum pernah dipesan dan tidak punya penawaran.
         </p>
+
+        <ShippingRuleForm supplierId={supplier.id} />
 
         <div>
           <h2 className="mb-3 text-base font-semibold text-slate-900">Pesanan</h2>

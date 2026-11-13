@@ -1,5 +1,6 @@
 import type {
   PaymentMethod,
+  PaymentStatus,
   PurchaseOrderItemAvailability,
   PurchaseOrderStatus,
 } from "@/lib/domain/orders/types";
@@ -31,4 +32,11 @@ export const PURCHASE_ORDER_ITEM_AVAILABILITY_LABELS: Record<
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   TUNAI: "Tunai",
   TRANSFER: "Transfer",
+  TEMPO: "Tempo",
+};
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  BELUM_BAYAR: "Belum Bayar",
+  DP: "DP",
+  LUNAS: "Lunas",
 };

@@ -159,8 +159,9 @@ Tujuan: CRUD data inti yang menjadi bahan baku perbandingan.
 - [x] Pengaturan `tax_rates` (khusus Pemilik/Admin) (R07, R26) — daftar &
       tambah lewat menu profil; edit/nonaktifkan tarif pajak lewat UI
       belum ada
-- [ ] Pengaturan `shipping_rules` per supplier (R08) — API sudah ada,
-      UI belum dibangun pada sesi ini
+- [x] Pengaturan `shipping_rules` per supplier (R08) — API sudah ada,
+      UI dibangun perbaikan #4 (2026-11-13): `ShippingRuleForm` di
+      halaman detail supplier (mode + tarif flat/minimum/area + catatan)
 - [x] Validasi form (Zod, sama dengan skema server) sesuai R29
 - [ ] Riwayat harga tampil di detail penawaran (read-only, dari `supplier_prices`) (R20) —
       hanya harga terbaru yang ditampilkan pada Tahap 3; riwayat lengkap belum ada UI-nya
@@ -174,10 +175,11 @@ Tujuan: CRUD data inti yang menjadi bahan baku perbandingan.
 > halaman pengaturan tarif pajak sudah dibangun dan lulus
 > `format`/`lint`/`typecheck`/`test`/`build`. Item yang SENGAJA belum
 > dikerjakan pada sesi ini (di luar cakupan checklist UI sederhana yang
-> diminta): upload foto produk, UI pengaturan `shipping_rules` per
-> supplier, UI edit/nonaktifkan tarif pajak, UI riwayat harga penawaran,
+> diminta): upload foto produk, UI edit/nonaktifkan tarif pajak, UI riwayat harga penawaran,
 > dan automated E2E test. Backend (API + repository) untuk semua item
-> tersebut sudah tersedia dan teruji lewat integration test.
+> tersebut sudah tersedia dan teruji lewat integration test. UI pengaturan
+> `shipping_rules` per supplier menyusul dibangun perbaikan #4
+> (2026-11-13) — lihat checklist Tahap 3 di atas.
 
 Exit criteria: pengguna dapat mengelola data supplier & produk end-to-end
 lewat UI, semua data tersimpan dengan audit dasar (R28), dan riwayat harga
@@ -320,7 +322,10 @@ kinerja supplier terupdate.
 - [x] Pesan WhatsApp multi-produk TANPA harga (`formatWhatsAppPurchaseOrderMessage`)
 - [x] Status ketersediaan per baris produk (Belum Dikonfirmasi/Tersedia/
       Sebagian/Tidak Tersedia), ditandai manual dari balasan WhatsApp
-- [x] Metode konfirmasi pembayaran (Tunai/Transfer)
+- [x] Metode konfirmasi pembayaran (Tunai/Transfer) — diperluas
+      perbaikan #4 (2026-11-13): + Tempo (jatuh tempo wajib), status
+      bayar Belum Bayar/DP/Lunas + jumlah dibayar + tombol Catat
+      Pembayaran, info bayar di pesan WhatsApp setelah konfirmasi
 - [x] Lokasi/cabang bisnis + pengisian otomatis alamat tujuan di halaman
       Bandingkan (docs/BACKLOG.md #1)
 

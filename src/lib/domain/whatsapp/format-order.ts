@@ -79,6 +79,13 @@ export interface WhatsAppPurchaseOrderMessageInput {
   supplierName: string;
   items: WhatsAppPurchaseOrderItemInput[];
   notes?: string | null;
+  /** Info pembayaran (perbaikan #4) — hanya diisi bila cara bayar sudah dipilih (setelah konfirmasi). */
+  paymentMethodLabel?: string | null;
+  paymentStatusLabel?: string | null;
+  /** Jumlah yang sudah dibayar (Rp). */
+  paidAmount?: Decimal.Value | null;
+  /** Total pesanan (Rp). */
+  orderTotal?: Decimal.Value | null;
 }
 
 /**
@@ -107,6 +114,21 @@ export function formatWhatsAppPurchaseOrderMessage(
 
   if (input.notes) {
     lines.push("", `Catatan: ${input.notes}`);
+  }
+
+  if (input.paymentMethodLabel) {
+    const paid =
+      input.paidAmount !== null &&
+      input.paidAmount !== undefined &&
+      new Decimal(input.paidAmount).gt(0)
+        ? ` — sudah dibayar ${formatRupiah(input.paidAmount.toString())}${
+            input.orderTotal !== null && input.orderTotal !== undefined
+              ? ` dari ${formatRupiah(input.orderTotal.toString())}`
+              : ""
+          }`
+        : "";
+    const status = input.paymentStatusLabel ? ` (${input.paymentStatusLabel})` : "";
+    lines.push("", `Pembayaran: ${input.paymentMethodLabel}${status}${paid}`);
   }
 
   lines.push("", "Mohon konfirmasi ketersediaan dan estimasi waktu pengiriman. Terima kasih.");

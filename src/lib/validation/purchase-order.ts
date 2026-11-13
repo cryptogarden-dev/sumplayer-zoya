@@ -66,11 +66,41 @@ export type PurchaseOrderItemAvailabilityInput = z.infer<
   typeof purchaseOrderItemAvailabilitySchema
 >;
 
-export const confirmPurchaseOrderSchema = z.object({
-  paymentMethod: z.enum(PAYMENT_METHODS),
-});
+/** Tanggal dari input `<input type="date">` (format YYYY-MM-DD). */
+const dateInputSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal tidak valid.")
+  .refine((value) => !Number.isNaN(new Date(`${value}T00:00:00`).getTime()), {
+    message: "Tanggal tidak valid.",
+  });
+
+/**
+ * Konfirmasi pesanan (DIPESAN -> DIKONFIRMASI). Bila cara bayar TEMPO,
+ * tanggal jatuh tempo WAJIB diisi (perbaikan #4); untuk TUNAI/TRANSFER
+ * tanggal diabaikan (disimpan NULL di server).
+ */
+export const confirmPurchaseOrderSchema = z
+  .object({
+    paymentMethod: z.enum(PAYMENT_METHODS),
+    paymentDueDate: dateInputSchema.optional(),
+  })
+  .refine((data) => data.paymentMethod !== "TEMPO" || data.paymentDueDate !== undefined, {
+    message: "Tanggal jatuh tempo wajib diisi untuk cara bayar Tempo.",
+    path: ["paymentDueDate"],
+  });
 
 export type ConfirmPurchaseOrderInput = z.infer<typeof confirmPurchaseOrderSchema>;
+
+/**
+ * Catat pembayaran (perbaikan #4). Batas atas jumlah (tidak boleh
+ * melebihi sisa tagihan) dicek di service layer karena total pesanan
+ * hanya diketahui server — validasi di sini hanya bentuk dasarnya.
+ */
+export const recordPaymentSchema = z.object({
+  amount: z.number().positive("Jumlah pembayaran harus lebih dari nol."),
+});
+
+export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>;
 
 export const cancelPurchaseOrderSchema = z.object({
   cancelReason: z.string().trim().min(1, "Alasan pembatalan wajib diisi (R29).").max(500),

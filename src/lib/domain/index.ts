@@ -44,3 +44,4 @@ export * from "@/lib/domain/recommendation/reason";
 export * from "@/lib/domain/whatsapp/format-order";
 
 export * from "@/lib/domain/orders/types";
+export * from "@/lib/domain/orders/payment";

@@ -68,6 +68,9 @@ export default async function PesananDetailPage({ params }: PesananDetailPagePro
           notes: order.notes,
           cancelReason: order.cancelReason,
           paymentMethod: order.paymentMethod,
+          paymentStatus: order.paymentStatus,
+          paidAmount: order.paidAmount.toString(),
+          paymentDueDate: order.paymentDueDate?.toISOString() ?? null,
           items: order.items.map((item) => ({
             id: item.id,
             productName: item.supplierProduct.product.productName,
