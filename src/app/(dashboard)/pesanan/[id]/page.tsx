@@ -4,6 +4,7 @@ import {
   computeOrderTotal,
   getPurchaseOrderById,
 } from "@/lib/server/repositories/purchase-order-repository";
+import { getGoodsReceiptByOrder } from "@/lib/server/repositories/goods-receipt-repository";
 import { listOffers } from "@/lib/server/repositories/supplier-product-repository";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -46,6 +47,8 @@ export default async function PesananDetailPage({ params }: PesananDetailPagePro
         })
       : [];
 
+  const receipt = await getGoodsReceiptByOrder(session.user.businessId, order.id);
+
   return (
     <div>
       <BackLink href="/pesanan" label="Kembali ke Pesanan" />
@@ -81,6 +84,30 @@ export default async function PesananDetailPage({ params }: PesananDetailPagePro
           })),
         }}
         orderTotal={computeOrderTotal(order).toString()}
+        receipt={
+          receipt
+            ? {
+                id: receipt.id,
+                receivedAt: receipt.receivedAt.toISOString(),
+                isPartial: receipt.isPartial,
+                overallCompleteness: receipt.overallCompleteness,
+                onTime: receipt.onTime,
+                receiptPhotoUrl: receipt.receiptPhotoUrl,
+                notes: receipt.notes,
+                items: receipt.items.map((receiptItem) => ({
+                  purchaseOrderItemId: receiptItem.purchaseOrderItemId,
+                  productName: receiptItem.purchaseOrderItem.supplierProduct.product.productName,
+                  orderedQty: receiptItem.orderedQty.toString(),
+                  receivedQty: receiptItem.receivedQty.toString(),
+                  conditionGoodQty: receiptItem.conditionGoodQty.toString(),
+                  conditionDamagedQty: receiptItem.conditionDamagedQty.toString(),
+                  priceMatches: receiptItem.priceMatches,
+                  actualPricePerPackage: receiptItem.actualPricePerPackage?.toString() ?? null,
+                  notes: receiptItem.notes,
+                })),
+              }
+            : null
+        }
         availableOffers={availableOffers.map((offer) => ({
           id: offer.id,
           productName: offer.product.productName,

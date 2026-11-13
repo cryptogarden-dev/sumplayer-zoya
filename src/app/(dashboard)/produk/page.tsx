@@ -71,6 +71,9 @@ export default async function ProdukPage() {
               offerCount: product._count.supplierProducts,
               lowestPrice,
               supplierIds: product.supplierProducts.map((offer) => offer.supplierId),
+              stockQty: product.stockQty.toString(),
+              lowStockThreshold: product.lowStockThreshold?.toString() ?? null,
+              baseUnit: product.baseUnit,
               category: product.category
                 ? { id: product.category.id, name: product.category.name }
                 : null,

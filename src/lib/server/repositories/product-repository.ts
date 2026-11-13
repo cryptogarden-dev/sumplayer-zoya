@@ -118,6 +118,12 @@ export async function updateProduct(businessId: string, id: string, input: Produ
       unitFamily: input.unitFamily,
       baseUnit: resolveBaseUnit(input),
       notes: input.notes ?? null,
+      // Stok hanya diubah bila klien mengirimnya (form edit) — form lain
+      // yang tidak mengirim field ini tidak akan menimpa stok yang ada.
+      ...(input.stockQty !== undefined ? { stockQty: input.stockQty } : {}),
+      ...(input.lowStockThreshold !== undefined
+        ? { lowStockThreshold: input.lowStockThreshold }
+        : {}),
     },
   });
 

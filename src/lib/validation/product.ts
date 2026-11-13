@@ -24,6 +24,16 @@ export const productInputSchema = z.object({
   photoUrl: optionalText(1000),
   unitFamily: z.enum(UNIT_FAMILIES),
   notes: optionalText(2000),
+  /** Stok toko saat ini (satuan dasar). Hanya dipakai saat edit — saat
+   * buat produk baru stok selalu mulai dari 0. */
+  stockQty: z.number().nonnegative("Stok toko tidak boleh negatif").optional(),
+  /** Ambang peringatan stok menipis (satuan dasar). `null` = matikan
+   * peringatan untuk produk ini. */
+  lowStockThreshold: z
+    .number()
+    .nonnegative("Ambang stok menipis tidak boleh negatif")
+    .nullable()
+    .optional(),
 });
 
 export type ProductInput = z.infer<typeof productInputSchema>;

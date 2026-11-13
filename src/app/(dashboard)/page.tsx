@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { requireSession } from "@/lib/auth/session";
 import { getDashboardSummary } from "@/lib/dashboard/summary";
 import { StatCard } from "@/components/ui/StatCard";
+import { Card } from "@/components/ui/Card";
 import { ROLE_LABELS } from "@/lib/auth/rbac";
+import { BASE_UNIT_LABELS } from "@/lib/format/units";
+
+const numberFormatter = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
 
 export const metadata: Metadata = { title: "Beranda" };
 export const dynamic = "force-dynamic";
@@ -39,6 +44,40 @@ export default async function BerandaPage() {
           description="Belum diterima/dibatalkan"
         />
       </div>
+
+      {summary.lowStockProducts.length > 0 ? (
+        <Card className="mt-6 border-amber-300 bg-amber-50">
+          <h2 className="text-base font-semibold text-amber-900">
+            Stok menipis ({summary.lowStockProducts.length})
+          </h2>
+          <p className="mt-1 text-sm text-amber-800">
+            Produk di bawah ini sudah mencapai atau melewati ambang stok menipis — pertimbangkan
+            untuk memesan lagi.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {summary.lowStockProducts.map((product) => (
+              <li
+                key={product.id}
+                className="flex flex-wrap items-center justify-between gap-2 text-sm"
+              >
+                <Link
+                  href={`/produk/${product.id}`}
+                  className="font-medium text-slate-900 hover:text-indigo-600"
+                >
+                  {product.productName}
+                </Link>
+                <span className="text-amber-800">
+                  Stok {numberFormatter.format(Number(product.stockQty))}{" "}
+                  {BASE_UNIT_LABELS[product.baseUnit]}
+                  {product.lowStockThreshold !== null
+                    ? ` (ambang ${numberFormatter.format(Number(product.lowStockThreshold))})`
+                    : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
     </div>
   );
 }

@@ -65,6 +65,27 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       <PageHeader title={product.productName} description="Ubah data produk atau nonaktifkan." />
 
       <div className="space-y-6">
+        <Card>
+          <p className="text-sm text-slate-600">
+            Stok toko:{" "}
+            <span className="font-semibold text-slate-900">
+              {Number(product.stockQty)} {BASE_UNIT_LABELS[product.baseUnit]}
+            </span>
+            {product.lowStockThreshold !== null &&
+            Number(product.stockQty) <= Number(product.lowStockThreshold) ? (
+              <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                Stok menipis
+              </span>
+            ) : null}
+            {product.lowStockThreshold !== null ? (
+              <span className="text-slate-500">
+                {" "}
+                (ambang {Number(product.lowStockThreshold)} {BASE_UNIT_LABELS[product.baseUnit]})
+              </span>
+            ) : null}
+          </p>
+        </Card>
+
         <ProductEditForm
           product={{
             id: product.id,
@@ -77,6 +98,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             photoUrl: product.photoUrl,
             unitFamily: product.unitFamily,
             notes: product.notes,
+            stockQty: product.stockQty.toString(),
+            lowStockThreshold: product.lowStockThreshold?.toString() ?? null,
           }}
           categories={categories.map((category) => ({ id: category.id, name: category.name }))}
         />

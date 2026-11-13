@@ -3,7 +3,8 @@ import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { NavIcon } from "@/components/app-shell/NavIcon";
 import { categoryTone } from "@/lib/format/category-color";
 import { formatRupiah } from "@/lib/format/currency";
-import type { UnitFamily } from "@/lib/domain/units/types";
+import { BASE_UNIT_LABELS } from "@/lib/format/units";
+import type { BaseUnit, UnitFamily } from "@/lib/domain/units/types";
 
 // Kelas Tailwind harus berupa literal statis agar terdeteksi compiler -
 // tidak bisa disusun lewat template string seperti `bg-${tone}-100`.
@@ -35,6 +36,11 @@ export interface ProductCardData {
   lowestPrice: number | null;
   supplierIds: string[];
   category: { id: string; name: string } | null;
+  /** Stok toko saat ini, dalam satuan dasar produk (R18). */
+  stockQty: string;
+  /** Ambang peringatan stok menipis, null bila tidak diatur. */
+  lowStockThreshold: string | null;
+  baseUnit: BaseUnit;
 }
 
 /**
@@ -53,6 +59,9 @@ export function ProductCard({
 }) {
   const tone = product.category ? categoryTone(product.category.id) : "slate";
   const subtitle = [product.brand, product.variant].filter(Boolean).join(" · ");
+  const stockQty = Number(product.stockQty);
+  const isLowStock =
+    product.lowStockThreshold !== null && stockQty <= Number(product.lowStockThreshold);
 
   return (
     <div
@@ -116,6 +125,15 @@ export function ProductCard({
             Mulai {formatRupiah(product.lowestPrice)}
           </p>
         ) : null}
+        <p className="text-xs text-slate-500">
+          Stok toko: {new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 }).format(stockQty)}{" "}
+          {BASE_UNIT_LABELS[product.baseUnit]}
+          {isLowStock ? (
+            <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">
+              Stok menipis
+            </span>
+          ) : null}
+        </p>
 
         <div className="mt-auto flex items-center justify-between pt-2 text-xs">
           <span className="font-medium text-indigo-600">

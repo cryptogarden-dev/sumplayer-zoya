@@ -63,6 +63,8 @@ model Business {
   businessLocations         BusinessLocation[]
   purchaseOrders            PurchaseOrder[]
   purchaseOrderItems        PurchaseOrderItem[]
+  goodsReceipts             GoodsReceipt[]
+  supplierPerformances      SupplierPerformance[]
 
   @@map("businesses")
 }
@@ -88,6 +90,7 @@ model User {
   updatedSupplierStocks   SupplierStock[]
   createdShippingRules    ShippingRule[]
   createdPurchaseOrders   PurchaseOrder[]
+  createdGoodsReceipts    GoodsReceipt[]
 
   @@map("users")
 }
@@ -220,6 +223,14 @@ model Product {
   photoUrl    String?    @map("photo_url")
   unitFamily  UnitFamily @map("unit_family")
   baseUnit    BaseUnit   @map("base_unit")
+  /// Stok toko sendiri (R18, Tahap 5): jumlah barang di gudang/toko dalam
+  /// satuan dasar produk (mis. kg untuk beras). Bertambah saat penerimaan
+  /// barang dicatat (hanya jumlah kondisi BAIK); bukan stok supplier.
+  stockQty           Decimal  @default(0) @map("stock_qty") @db.Decimal(14, 4)
+  /// Ambang peringatan stok menipis (satuan dasar). NULL = tidak ada
+  /// peringatan untuk produk ini. Produk aktif dengan stockQty <= ambang
+  /// tampil di kartu "Stok menipis" di Beranda.
+  lowStockThreshold  Decimal? @map("low_stock_threshold") @db.Decimal(14, 4)
   notes       String?
   isActive    Boolean    @default(true) @map("is_active")
   createdAt   DateTime   @default(now()) @map("created_at")
@@ -282,6 +293,7 @@ model Supplier {
   supplierProducts  SupplierProduct[]
   shippingRule      ShippingRule?
   purchaseOrders    PurchaseOrder[]
+  supplierPerformances SupplierPerformance[]
 
   @@index([businessId])
   @@index([businessId, isActive])
@@ -540,6 +552,14 @@ enum PurchaseOrderStatus {
   DIBATALKAN
 }
 
+/// Kelengkapan penerimaan barang secara keseluruhan (R18): LENGKAP bila
+/// setiap baris diterima >= yang dipesan, KURANG bila ada baris yang
+/// diterima kurang dari yang dipesan.
+enum GoodsReceiptCompleteness {
+  LENGKAP
+  KURANG
+}
+
 /// Status ketersediaan per baris produk dalam pesanan. Diisi MANUAL oleh
 /// pengguna setelah membaca balasan supplier di WhatsApp - TIDAK ada
 /// integrasi otomatis ke WhatsApp. `SEBAGIAN` memakai
@@ -580,6 +600,9 @@ model PurchaseOrder {
   cancelReason  String?             @map("cancel_reason")
   sentAt        DateTime?           @map("sent_at")
   confirmedAt   DateTime?           @map("confirmed_at")
+  /// Diisi saat penerimaan barang dicatat (R18) — status berubah jadi
+  /// DITERIMA pada saat yang sama.
+  receivedAt    DateTime?           @map("received_at")
   cancelledAt   DateTime?           @map("cancelled_at")
   createdAt     DateTime            @default(now()) @map("created_at")
   updatedAt     DateTime            @updatedAt @map("updated_at")
@@ -590,6 +613,8 @@ model PurchaseOrder {
   location  BusinessLocation?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
   createdBy User                @relation(fields: [createdById], references: [id])
   items     PurchaseOrderItem[]
+  /// Satu pesanan = satu penerimaan barang di v1 (UNIQUE di goods_receipts).
+  goodsReceipt GoodsReceipt?
 
   @@unique([businessId, orderNumber])
   @@index([businessId, status])
@@ -624,9 +649,94 @@ model PurchaseOrderItem {
   purchaseOrder   PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   business        Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
   supplierProduct SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  goodsReceiptItems GoodsReceiptItem[]
 
   @@unique([purchaseOrderId, supplierProductId])
   @@index([purchaseOrderId])
   @@index([supplierProductId])
   @@map("purchase_order_items")
+}
+
+// ---------------------------------------------------------------------------
+// Tahap 5: Penerimaan barang & kinerja supplier (R18, R15)
+// (docs/DATA_MODEL.md §19-21, docs/IMPLEMENTATION_PLAN.md Tahap 5)
+// ---------------------------------------------------------------------------
+
+/// Penerimaan barang fisik untuk satu pesanan (R18). Satu pesanan hanya
+/// punya SATU penerimaan di v1 (`purchase_order_id` UNIQUE) — penerimaan
+/// parsial dicatat lewat `isPartial`/`overallCompleteness`, bukan lewat
+/// penerimaan kedua.
+model GoodsReceipt {
+  id                   String                   @id @default(uuid()) @db.Uuid
+  businessId           String                   @map("business_id") @db.Uuid
+  purchaseOrderId      String                   @unique @map("purchase_order_id") @db.Uuid
+  receivedAt           DateTime                 @map("received_at")
+  isPartial            Boolean                  @default(false) @map("is_partial")
+  overallCompleteness  GoodsReceiptCompleteness @map("overall_completeness")
+  onTime               Boolean                  @map("on_time")
+  receiptPhotoUrl      String?                  @map("receipt_photo_url")
+  notes                String?
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
+  createdById          String                   @map("created_by") @db.Uuid
+
+  business      Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  purchaseOrder PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  createdBy     User               @relation(fields: [createdById], references: [id])
+  items         GoodsReceiptItem[]
+
+  @@index([purchaseOrderId])
+  @@index([businessId, receivedAt])
+  @@map("goods_receipts")
+}
+
+/// Satu baris penerimaan: jumlah diterima vs dipesan, kondisi baik/rusak,
+/// dan harga sesuai/tidak (R18). `ordered_qty` dalam kemasan (bukan
+/// satuan dasar) agar langsung sebanding dengan `received_qty`.
+/// Constraint `condition_good_qty + condition_damaged_qty <= received_qty`
+/// ditegakkan di service layer DAN CHECK constraint DB (lihat migration.sql).
+model GoodsReceiptItem {
+  id                     String   @id @default(uuid()) @db.Uuid
+  goodsReceiptId         String   @map("goods_receipt_id") @db.Uuid
+  purchaseOrderItemId    String   @map("purchase_order_item_id") @db.Uuid
+  businessId             String   @map("business_id") @db.Uuid
+  orderedQty             Decimal  @map("ordered_qty") @db.Decimal(14, 4)
+  receivedQty            Decimal  @map("received_qty") @db.Decimal(14, 4)
+  conditionGoodQty       Decimal  @default(0) @map("condition_good_qty") @db.Decimal(14, 4)
+  conditionDamagedQty    Decimal  @default(0) @map("condition_damaged_qty") @db.Decimal(14, 4)
+  priceMatches           Boolean  @map("price_matches")
+  actualPricePerPackage  Decimal? @map("actual_price_per_package") @db.Decimal(18, 2)
+  notes                  String?
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  goodsReceipt      GoodsReceipt      @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  purchaseOrderItem PurchaseOrderItem @relation(fields: [purchaseOrderItemId], references: [id], onDelete: Cascade)
+  business          Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([goodsReceiptId])
+  @@index([purchaseOrderItemId])
+  @@map("goods_receipt_items")
+}
+
+/// Agregat kinerja supplier (R14, R15) — cache baca cepat untuk halaman
+/// Bandingkan, direkomputasi setiap ada `goods_receipt` baru. BUKAN
+/// sumber kebenaran: sumber kebenaran tetap `goods_receipts` /
+/// `purchase_orders`. `on_time_rate` memakai rumus Laplace smoothing
+/// `(on_time_count + 1) / (completed_orders_count + 2)` (lihat
+/// `src/lib/domain/performance/on-time-rate.ts`).
+model SupplierPerformance {
+  id                   String   @id @default(uuid()) @db.Uuid
+  businessId           String   @map("business_id") @db.Uuid
+  supplierId           String   @unique @map("supplier_id") @db.Uuid
+  completedOrdersCount Int      @default(0) @map("completed_orders_count")
+  onTimeCount          Int      @default(0) @map("on_time_count")
+  onTimeRate           Decimal  @default(0.5) @map("on_time_rate") @db.Decimal(6, 4)
+  lastCalculatedAt     DateTime @map("last_calculated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@map("supplier_performance")
 }

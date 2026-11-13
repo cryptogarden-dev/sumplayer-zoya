@@ -276,18 +276,31 @@ kinerja supplier terupdate.
 - [x] Skema Prisma: `purchase_orders`, `purchase_order_items` (R16) —
       dengan revisi (status `DIKONFIRMASI` tambahan, `payment_method`,
       `availability_status` per baris — lihat catatan di atas)
-- [ ] Skema Prisma: `goods_receipts`, `goods_receipt_items` (R18)
-- [ ] Skema Prisma: `supplier_performance` (agregat, direkomputasi) (R14, R15)
+- [x] Skema Prisma: `goods_receipts`, `goods_receipt_items` (R18) —
+      migrasi `20261113083703_penerimaan_barang_stok` (dijalankan lewat
+      Supabase SQL Editor, SQL idempotent sebisanya); satu pesanan = satu
+      penerimaan di v1 (UNIQUE `purchase_order_id`)
+- [x] Skema Prisma: `supplier_performance` (agregat, direkomputasi) (R14, R15) —
+      migrasi yang sama; kolom `stock_qty`/`low_stock_threshold` di
+      `products` dan `received_at` di `purchase_orders` ikut ditambahkan
 - [ ] Skema Prisma: `recurring_order_templates` (+ items), `reminders` (R19)
 - [x] Skema Prisma tambahan (di luar rencana awal): `business_locations`
       (lokasi/cabang bisnis, docs/BACKLOG.md #1)
 - [x] Halaman "Pesanan": daftar dengan status, detail, ubah status (R16)
       — status yang diimplementasikan: draft/dipesan/dikonfirmasi/
-      dibatalkan (dikirim/diterima menyusul bersama R18)
+      diterima (+ dibatalkan); status DIKIRIM ada di enum tapi belum ada
+      transisi UI ke sana — penerimaan bisa dicatat langsung dari
+      DIKONFIRMASI
 - [x] Pembatalan pesanan wajib mengisi alasan (R29)
 - [x] Nomor pesanan otomatis & unik per bisnis (R16) — format `PO-YYYY-NNNN`
-- [ ] Form penerimaan barang: jumlah diterima vs dipesan, parsial, kondisi baik/rusak, jumlah rusak, harga sesuai/beda, tepat waktu/terlambat, foto nota opsional, catatan (R18)
-- [ ] Setelah penerimaan disimpan → rekomputasi `supplier_performance` (jumlah selesai, jumlah tepat waktu) (R15)
+- [x] Form penerimaan barang: jumlah diterima vs dipesan, parsial, kondisi baik/rusak, jumlah rusak, harga sesuai/beda, tepat waktu/terlambat, foto nota opsional, catatan (R18) —
+      form "Terima Barang" di `PesananWorkspace` (status DIKONFIRMASI/DIKIRIM),
+      foto nota memakai `PhotoUploader` + `POST /api/products/photo` yang sudah ada;
+      ringkasan penerimaan tampil setelah status jadi DITERIMA
+- [x] Setelah penerimaan disimpan → rekomputasi `supplier_performance` (jumlah selesai, jumlah tepat waktu) (R15) —
+      dihitung ulang dari `purchase_orders` DITERIMA + `goods_receipts`
+      on_time di transaksi yang sama; halaman Bandingkan memakai data nyata
+      ini (bukan lagi 0,0 hardcode) untuk kolom Ketepatan Waktu
 - [ ] Halaman "Jadwal Rutin": daftar hari pengiriman per supplier, template pesanan, frekuensi, pengingat (R19)
 - [ ] Tombol "Pesan Lagi" → membuat **draft** dari template/pesanan sebelumnya, tanpa auto-submit (R19)
 - [ ] Notifikasi/pengingat tampil di UI (in-app), sesuai jadwal cut-off supplier (R01, R19)

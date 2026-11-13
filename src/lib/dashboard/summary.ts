@@ -1,10 +1,14 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { listLowStockProducts } from "@/lib/server/repositories/goods-receipt-repository";
+import type { Product } from "@generated/prisma/client";
 
 export interface DashboardSummary {
   supplierCount: number;
   productCount: number;
   activeOrderCount: number;
+  /** Produk aktif yang stok tokonya sudah <= ambang peringatan (R18). */
+  lowStockProducts: Product[];
 }
 
 const INACTIVE_ORDER_STATUSES = ["DITERIMA", "DIBATALKAN"] as const;
@@ -16,13 +20,14 @@ const INACTIVE_ORDER_STATUSES = ["DITERIMA", "DIBATALKAN"] as const;
  * berguna.
  */
 export async function getDashboardSummary(businessId: string): Promise<DashboardSummary> {
-  const [supplierCount, productCount, activeOrderCount] = await Promise.all([
+  const [supplierCount, productCount, activeOrderCount, lowStockProducts] = await Promise.all([
     prisma.supplier.count({ where: { businessId, isActive: true } }),
     prisma.product.count({ where: { businessId, isActive: true } }),
     prisma.purchaseOrder.count({
       where: { businessId, status: { notIn: [...INACTIVE_ORDER_STATUSES] } },
     }),
+    listLowStockProducts(businessId),
   ]);
 
-  return { supplierCount, productCount, activeOrderCount };
+  return { supplierCount, productCount, activeOrderCount, lowStockProducts };
 }

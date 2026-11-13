@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/Label";
 import { Select } from "@/components/ui/Select";
 import { Card } from "@/components/ui/Card";
 import { Chip } from "@/components/ui/Chip";
+import { PhotoUploader } from "@/components/produk/PhotoUploader";
 import { formatRupiah } from "@/lib/format/currency";
+import { formatTanggalIndonesia } from "@/lib/format/date";
 import {
   PAYMENT_METHOD_LABELS,
   PURCHASE_ORDER_ITEM_AVAILABILITY_LABELS,
@@ -84,25 +86,63 @@ interface OrderView {
   items: OrderItemView[];
 }
 
+interface ReceiptItemView {
+  purchaseOrderItemId: string;
+  productName: string;
+  /** Jumlah yang dipesan, dalam kemasan. */
+  orderedQty: string;
+  receivedQty: string;
+  conditionGoodQty: string;
+  conditionDamagedQty: string;
+  priceMatches: boolean;
+  actualPricePerPackage: string | null;
+  notes: string | null;
+}
+
+export interface GoodsReceiptView {
+  id: string;
+  receivedAt: string;
+  isPartial: boolean;
+  overallCompleteness: "LENGKAP" | "KURANG";
+  onTime: boolean;
+  receiptPhotoUrl: string | null;
+  notes: string | null;
+  items: ReceiptItemView[];
+}
+
+/** Draft satu baris form penerimaan (jumlah dalam kemasan). */
+interface ReceiptItemDraft {
+  receivedQty: string;
+  conditionGoodQty: string;
+  conditionDamagedQty: string;
+  priceMatches: boolean;
+  actualPricePerPackage: string;
+  notes: string;
+}
+
 function displayName(item: { productName: string; brand: string | null; variant: string | null }) {
   return [item.productName, item.brand, item.variant].filter(Boolean).join(" ");
 }
 
 /**
- * Ruang kerja satu pesanan (R16/R17, pengembangan lanjutan disepakati
+ * Ruang kerja satu pesanan (R16/R17/R18, pengembangan lanjutan disepakati
  * 2026-08-18 - lihat docs/BACKLOG.md #2). Tampilan berubah sesuai status:
  * DRAFT (susun daftar produk) -> DIPESAN (tandai ketersediaan per baris
  * setelah balasan WhatsApp supplier) -> DIKONFIRMASI (metode bayar
- * dipilih, ringkasan final).
+ * dipilih, ringkasan final) -> DITERIMA (barang dicatat lewat form
+ * penerimaan: jumlah diterima vs dipesan, kondisi baik/rusak, harga
+ * sesuai/tidak, tepat waktu/tidak).
  */
 export function PesananWorkspace({
   order,
   orderTotal,
   availableOffers,
+  receipt,
 }: {
   order: OrderView;
   orderTotal: string;
   availableOffers: AvailableOfferView[];
+  receipt: GoodsReceiptView | null;
 }) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
@@ -253,6 +293,74 @@ export function PesananWorkspace({
       return;
     }
     await callApi(`/api/purchase-orders/${order.id}/cancel`, "PATCH", { cancelReason });
+  }
+
+  // Form penerimaan barang (R18) — hanya untuk DIKONFIRMASI/DIKIRIM yang
+  // belum pernah dicatat penerimaannya. Jumlah default = yang dipesan
+  // (pakai jumlah dikonfirmasi bila status SEBAGIAN), kondisi baik
+  // default = seluruhnya diterima baik; pengguna mengubah bila ada yang
+  // kurang/rusak. Hanya barang kondisi BAIK yang menambah stok toko.
+  const orderedQtyOf = (item: OrderItemView) =>
+    item.availabilityStatus === "SEBAGIAN" && item.confirmedPackageQty !== null
+      ? item.confirmedPackageQty
+      : item.packageQty;
+
+  const [receiptItems, setReceiptItems] = useState<Record<string, ReceiptItemDraft>>(() =>
+    Object.fromEntries(
+      order.items.map((item) => {
+        const ordered = orderedQtyOf(item);
+        return [
+          item.id,
+          {
+            receivedQty: ordered,
+            conditionGoodQty: ordered,
+            conditionDamagedQty: "0",
+            priceMatches: true,
+            actualPricePerPackage: "",
+            notes: "",
+          },
+        ];
+      }),
+    ),
+  );
+  const [receiptOnTime, setReceiptOnTime] = useState(true);
+  const [receiptNotes, setReceiptNotes] = useState("");
+  const [receiptPhotoUrl, setReceiptPhotoUrl] = useState("");
+
+  function updateReceiptItem(itemId: string, patch: Partial<ReceiptItemDraft>) {
+    setReceiptItems((current) => ({
+      ...current,
+      [itemId]: { ...current[itemId]!, ...patch },
+    }));
+  }
+
+  async function handleSubmitReceipt() {
+    const items = order.items.map((item) => {
+      const draft = receiptItems[item.id]!;
+      return {
+        purchaseOrderItemId: item.id,
+        receivedQty: Number(draft.receivedQty),
+        conditionGoodQty: Number(draft.conditionGoodQty),
+        conditionDamagedQty: Number(draft.conditionDamagedQty),
+        priceMatches: draft.priceMatches,
+        actualPricePerPackage: draft.priceMatches ? undefined : Number(draft.actualPricePerPackage),
+        notes: draft.notes || undefined,
+      };
+    });
+    const missingPrice = items.some(
+      (item) =>
+        !item.priceMatches && (!item.actualPricePerPackage || item.actualPricePerPackage <= 0),
+    );
+    if (missingPrice) {
+      setFormError("Isi harga sebenarnya per kemasan untuk baris yang harganya tidak sesuai.");
+      return;
+    }
+    await callApi(`/api/purchase-orders/${order.id}/receipt`, "POST", {
+      items,
+      onTime: receiptOnTime,
+      notes: receiptNotes || undefined,
+      receiptPhotoUrl: receiptPhotoUrl || undefined,
+    });
   }
 
   /** Hapus permanen (docs/BACKLOG.md #5) - hanya untuk DRAFT/DIBATALKAN,
@@ -508,6 +616,191 @@ export function PesananWorkspace({
           <Button disabled={isBusy || !allMarked} onClick={handleConfirm}>
             Konfirmasi Pesanan
           </Button>
+        </Card>
+      ) : null}
+
+      {(order.status === "DIKONFIRMASI" || order.status === "DIKIRIM") && !receipt ? (
+        <Card>
+          <h2 className="mb-1 text-base font-semibold text-slate-900">Terima Barang</h2>
+          <p className="mb-4 text-sm text-slate-500">
+            Catat barang yang benar-benar diterima. Hanya barang kondisi baik yang menambah stok
+            toko. Satu pesanan hanya dicatat sekali — periksa baik-baik sebelum menyimpan.
+          </p>
+          <div className="space-y-4">
+            {order.items.map((item) => {
+              const draft = receiptItems[item.id]!;
+              const ordered = orderedQtyOf(item);
+              return (
+                <div key={item.id} className="rounded-lg border border-slate-200 p-3">
+                  <p className="text-sm font-semibold text-slate-900">{displayName(item)}</p>
+                  <p className="text-xs text-slate-500">
+                    Dipesan: {ordered} {item.packageTypeLabel} · Harga snapshot{" "}
+                    {formatRupiah(Number(item.pricePerPackageSnapshot))}/{item.packageTypeLabel}
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div>
+                      <Label htmlFor={`received-${item.id}`}>Diterima</Label>
+                      <Input
+                        id={`received-${item.id}`}
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={draft.receivedQty}
+                        onChange={(event) =>
+                          updateReceiptItem(item.id, { receivedQty: event.target.value })
+                        }
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`good-${item.id}`}>Kondisi Baik</Label>
+                      <Input
+                        id={`good-${item.id}`}
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={draft.conditionGoodQty}
+                        onChange={(event) =>
+                          updateReceiptItem(item.id, { conditionGoodQty: event.target.value })
+                        }
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`damaged-${item.id}`}>Kondisi Rusak</Label>
+                      <Input
+                        id={`damaged-${item.id}`}
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={draft.conditionDamagedQty}
+                        onChange={(event) =>
+                          updateReceiptItem(item.id, { conditionDamagedQty: event.target.value })
+                        }
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={draft.priceMatches}
+                        onChange={(event) =>
+                          updateReceiptItem(item.id, { priceMatches: event.target.checked })
+                        }
+                      />
+                      Harga sesuai
+                    </label>
+                    {!draft.priceMatches ? (
+                      <div>
+                        <Label htmlFor={`actual-price-${item.id}`}>Harga sebenarnya /kemasan</Label>
+                        <Input
+                          id={`actual-price-${item.id}`}
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="Rp"
+                          value={draft.actualPricePerPackage}
+                          onChange={(event) =>
+                            updateReceiptItem(item.id, {
+                              actualPricePerPackage: event.target.value,
+                            })
+                          }
+                          className="w-40"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="mt-3">
+                    <Label htmlFor={`receipt-note-${item.id}`}>Catatan baris (opsional)</Label>
+                    <Input
+                      id={`receipt-note-${item.id}`}
+                      placeholder="Opsional"
+                      value={draft.notes}
+                      onChange={(event) =>
+                        updateReceiptItem(item.id, { notes: event.target.value })
+                      }
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={receiptOnTime}
+                onChange={(event) => setReceiptOnTime(event.target.checked)}
+              />
+              Tiba tepat waktu
+            </label>
+            <div>
+              <Label htmlFor="receipt-notes">Catatan umum (opsional)</Label>
+              <textarea
+                id="receipt-notes"
+                value={receiptNotes}
+                onChange={(event) => setReceiptNotes(event.target.value)}
+                className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2 text-base text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none"
+              />
+            </div>
+            <div>
+              <Label>Foto nota (opsional)</Label>
+              <PhotoUploader value={receiptPhotoUrl} onChange={setReceiptPhotoUrl} />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <Button disabled={isBusy} onClick={handleSubmitReceipt}>
+              Simpan Penerimaan Barang
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
+      {receipt ? (
+        <Card className="border-emerald-300 bg-emerald-50">
+          <h2 className="text-base font-semibold text-emerald-900">Penerimaan Barang</h2>
+          <p className="mt-1 text-sm text-emerald-800">
+            Diterima {formatTanggalIndonesia(new Date(receipt.receivedAt))} ·{" "}
+            {receipt.overallCompleteness === "LENGKAP" ? "Lengkap" : "Kurang (parsial)"} ·{" "}
+            {receipt.onTime ? "Tiba tepat waktu" : "Terlambat"}
+          </p>
+          <ul className="mt-3 space-y-2">
+            {receipt.items.map((receiptItem) => (
+              <li key={receiptItem.purchaseOrderItemId} className="text-sm text-slate-700">
+                <span className="font-medium text-slate-900">{receiptItem.productName}</span> —{" "}
+                diterima {receiptItem.receivedQty} dari {receiptItem.orderedQty} kemasan (baik{" "}
+                {receiptItem.conditionGoodQty}
+                {Number(receiptItem.conditionDamagedQty) > 0
+                  ? `, rusak ${receiptItem.conditionDamagedQty}`
+                  : ""}
+                )
+                {receiptItem.priceMatches
+                  ? " · harga sesuai"
+                  : ` · harga sebenarnya ${formatRupiah(Number(receiptItem.actualPricePerPackage))}`}
+                {receiptItem.notes ? ` · ${receiptItem.notes}` : ""}
+              </li>
+            ))}
+          </ul>
+          {receipt.notes ? (
+            <p className="mt-3 text-sm text-slate-600">Catatan: {receipt.notes}</p>
+          ) : null}
+          {receipt.receiptPhotoUrl ? (
+            <p className="mt-2 text-sm">
+              <a
+                href={receipt.receiptPhotoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-indigo-600 hover:text-indigo-700"
+              >
+                Lihat foto nota
+              </a>
+            </p>
+          ) : null}
         </Card>
       ) : null}
 

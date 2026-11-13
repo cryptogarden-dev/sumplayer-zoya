@@ -32,6 +32,7 @@ export * from "@/lib/domain/freshness/data-freshness";
 export * from "@/lib/domain/scheduling/delivery-estimate";
 
 export * from "@/lib/domain/performance/on-time-rate";
+export * from "@/lib/domain/receiving/goods-receipt";
 
 export * from "@/lib/domain/recommendation/config";
 export * from "@/lib/domain/recommendation/location";

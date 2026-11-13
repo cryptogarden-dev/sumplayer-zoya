@@ -37,6 +37,7 @@ import {
   type OfferForComparison,
 } from "@/lib/server/repositories/supplier-product-repository";
 import { getStaleDataThresholdDays } from "@/lib/server/repositories/business-settings-repository";
+import { listSupplierPerformances } from "@/lib/server/repositories/goods-receipt-repository";
 
 export class ProductNotFoundError extends Error {
   constructor() {
@@ -200,6 +201,10 @@ function buildRowContext(
     neededByDate: Date;
     today: Date;
     staleDataThresholdDays: number;
+    /** Kinerja nyata supplier dari `supplier_performance` (R15, Tahap 5).
+     * `undefined` = belum ada baris kinerja -> 0,0 (pesan "Data pengiriman
+     * belum tersedia" tetap muncul, bukan data palsu). */
+    performance?: { onTimeCount: number; completedOrdersCount: number };
   },
 ): RowContext {
   const latestPrice = offer.prices[0];
@@ -294,12 +299,15 @@ function buildRowContext(
     input.destination,
   );
 
-  // Belum ada mekanisme riwayat pengiriman (tabel `supplier_performance`
-  // adalah Tahap 5, di luar cakupan Tahap 4) — SELALU 0 data untuk saat
-  // ini. Parameter tetap diteruskan secara eksplisit (bukan hardcode di
-  // dalam rumus `estimateOnTimeRate`) agar begitu Tahap 5 selesai, hanya
-  // baris ini yang perlu diubah untuk membaca data nyata.
-  const reliability = estimateOnTimeRate({ onTimeCount: 0, completedCount: 0 });
+  // Kinerja nyata dari `supplier_performance` (R15, Tahap 5) — dihitung
+  // ulang setiap ada penerimaan barang. Bila supplier belum punya baris
+  // kinerja (belum ada pesanan yang diterima), dipakai 0,0 sehingga
+  // `estimateOnTimeRate` tetap menampilkan "Data pengiriman belum
+  // tersedia", bukan persentase seolah itu penilaian nyata.
+  const reliability = estimateOnTimeRate({
+    onTimeCount: input.performance?.onTimeCount ?? 0,
+    completedCount: input.performance?.completedOrdersCount ?? 0,
+  });
 
   const priceFreshness = evaluateFreshness({
     lastUpdatedAt: latestPrice.createdAt,
@@ -430,6 +438,22 @@ export async function buildComparison(input: BuildComparisonInput): Promise<Comp
   const staleDataThresholdDays = await getStaleDataThresholdDays(input.businessId);
   const today = input.today ?? new Date();
   const offers = await listOffersForComparison(input.businessId, input.productId);
+  const performances = await listSupplierPerformances(
+    input.businessId,
+    Array.from(new Set(offers.map((offer) => offer.supplier.id))),
+  );
+  const performanceBySupplierId = new Map<
+    string,
+    { onTimeCount: number; completedOrdersCount: number }
+  >(
+    performances.map((performance) => [
+      performance.supplierId,
+      {
+        onTimeCount: performance.onTimeCount,
+        completedOrdersCount: performance.completedOrdersCount,
+      },
+    ]),
+  );
 
   const contexts = offers.map((offer) =>
     buildRowContext(offer, {
@@ -438,6 +462,7 @@ export async function buildComparison(input: BuildComparisonInput): Promise<Comp
       neededByDate: input.neededByDate,
       today,
       staleDataThresholdDays,
+      performance: performanceBySupplierId.get(offer.supplier.id),
     }),
   );
 

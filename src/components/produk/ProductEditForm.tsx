@@ -21,6 +21,8 @@ interface ProductFieldErrors {
   categoryId?: string[];
   photoUrl?: string[];
   unitFamily?: string[];
+  stockQty?: string[];
+  lowStockThreshold?: string[];
 }
 
 /**
@@ -39,6 +41,10 @@ export interface ProductEditFormData {
   photoUrl: string | null;
   unitFamily: UnitFamily;
   notes: string | null;
+  /** Stok toko saat ini, dalam satuan dasar produk (R18). */
+  stockQty: string;
+  /** Ambang peringatan stok menipis, null bila tidak diatur. */
+  lowStockThreshold: string | null;
 }
 
 export function ProductEditForm({
@@ -57,6 +63,8 @@ export function ProductEditForm({
   const [categoryOptions, setCategoryOptions] = useState(categories);
   const [photoUrl, setPhotoUrl] = useState(product.photoUrl ?? "");
   const [unitFamily, setUnitFamily] = useState<UnitFamily>(product.unitFamily);
+  const [stockQty, setStockQty] = useState(product.stockQty);
+  const [lowStockThreshold, setLowStockThreshold] = useState(product.lowStockThreshold ?? "");
   const [fieldErrors, setFieldErrors] = useState<ProductFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -80,6 +88,8 @@ export function ProductEditForm({
         categoryId: categoryId || undefined,
         photoUrl: photoUrl.trim() || undefined,
         unitFamily,
+        stockQty: Number(stockQty),
+        lowStockThreshold: lowStockThreshold.trim() === "" ? null : Number(lowStockThreshold),
         // TIDAK ditampilkan di form sederhana ini, tetapi dikirim apa
         // adanya (nilai lama) agar tidak tertimpa kosong saat menyimpan
         // (PATCH membutuhkan seluruh field, bukan partial).
@@ -164,6 +174,46 @@ export function ProductEditForm({
       <div>
         <Label>Foto Produk (opsional)</Label>
         <PhotoUploader value={photoUrl} onChange={setPhotoUrl} error={fieldErrors.photoUrl?.[0]} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="stockQty">Stok toko saat ini</Label>
+          <Input
+            id="stockQty"
+            type="number"
+            min="0"
+            step="any"
+            value={stockQty}
+            onChange={(event) => setStockQty(event.target.value)}
+          />
+          {fieldErrors.stockQty ? (
+            <p className="mt-1 text-xs text-red-600">{fieldErrors.stockQty[0]}</p>
+          ) : (
+            <p className="mt-1 text-xs text-slate-400">
+              Dalam satuan dasar produk. Bertambah otomatis saat penerimaan barang dicatat.
+            </p>
+          )}
+        </div>
+        <div>
+          <Label htmlFor="lowStockThreshold">Ambang stok menipis</Label>
+          <Input
+            id="lowStockThreshold"
+            type="number"
+            min="0"
+            step="any"
+            placeholder="Opsional"
+            value={lowStockThreshold}
+            onChange={(event) => setLowStockThreshold(event.target.value)}
+          />
+          {fieldErrors.lowStockThreshold ? (
+            <p className="mt-1 text-xs text-red-600">{fieldErrors.lowStockThreshold[0]}</p>
+          ) : (
+            <p className="mt-1 text-xs text-slate-400">
+              Kosongkan bila tidak mau ada peringatan. Stok di bawah ambang tampil di Beranda.
+            </p>
+          )}
+        </div>
       </div>
 
       <div>

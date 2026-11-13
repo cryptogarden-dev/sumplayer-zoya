@@ -9,7 +9,7 @@ describe("getDashboardSummary (poin 18 - tanpa statistik palsu)", () => {
       supplierCount: 0,
       productCount: 0,
       activeOrderCount: 0,
-      reminderCount: 0,
+      lowStockProducts: [],
     });
   });
 
