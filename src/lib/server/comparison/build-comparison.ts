@@ -160,6 +160,9 @@ export interface ComparisonResult {
     sku: string;
     unitFamily: UnitFamily;
     baseUnit: BaseUnit;
+    /** Harga jual per satuan dasar, null bila belum diatur (dipakai panel
+     * "Rekomendasi Harga Jual" di halaman Bandingkan). */
+    sellPricePerBaseUnit: Decimal | null;
   };
   neededQuantityInBaseUnit: Decimal;
   rows: ComparisonRow[];
@@ -358,7 +361,10 @@ function decimalOrNull(value: Decimal | null): string | null {
  */
 export function serializeComparisonResult(result: ComparisonResult) {
   return {
-    product: result.product,
+    product: {
+      ...result.product,
+      sellPricePerBaseUnit: result.product.sellPricePerBaseUnit?.toString() ?? null,
+    },
     neededQuantityInBaseUnit: result.neededQuantityInBaseUnit.toString(),
     rows: result.rows.map((row) => ({
       offerId: row.offerId,
@@ -644,6 +650,7 @@ export async function buildComparison(input: BuildComparisonInput): Promise<Comp
       sku: product.sku,
       unitFamily: product.unitFamily,
       baseUnit: product.baseUnit,
+      sellPricePerBaseUnit: product.sellPricePerBaseUnit,
     },
     neededQuantityInBaseUnit: neededBase.quantity,
     rows,

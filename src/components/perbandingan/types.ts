@@ -12,6 +12,8 @@ export interface ComparisonApiResponse {
     sku: string;
     unitFamily: "WEIGHT" | "VOLUME" | "COUNT";
     baseUnit: "KILOGRAM" | "LITER" | "PCS";
+    /** Harga jual per satuan dasar, null bila belum diatur. */
+    sellPricePerBaseUnit: string | null;
   };
   neededQuantityInBaseUnit: string;
   rows: ComparisonRowDto[];

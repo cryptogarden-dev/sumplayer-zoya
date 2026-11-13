@@ -12,8 +12,10 @@ import { ComparisonFilters } from "@/components/perbandingan/ComparisonFilters";
 import { ComparisonCards } from "@/components/perbandingan/ComparisonCards";
 import { ComparisonTable } from "@/components/perbandingan/ComparisonTable";
 import { BestOfferPanel } from "@/components/perbandingan/BestOfferPanel";
+import { SellRecommendationPanel } from "@/components/perbandingan/SellRecommendationPanel";
 import { LABEL } from "@/lib/domain/recommendation/labels";
 import { formatRupiah } from "@/lib/format/currency";
+import { BASE_UNIT_LABELS } from "@/lib/format/units";
 import type {
   ComparisonApiResponse,
   ComparisonFiltersState,
@@ -314,8 +316,15 @@ export function ComparisonView() {
                   />
                 </div>
                 {bestRow ? (
-                  <div className="order-first lg:order-none">
+                  <div className="order-first space-y-6 lg:order-none">
                     <BestOfferPanel row={bestRow} productName={result.product.productName} />
+                    <SellRecommendationPanel
+                      productId={result.product.id}
+                      baseUnitLabel={BASE_UNIT_LABELS[result.product.baseUnit]}
+                      sellPricePerBaseUnit={result.product.sellPricePerBaseUnit}
+                      bestRow={bestRow}
+                      onSellPriceApplied={handleSubmit}
+                    />
                   </div>
                 ) : null}
               </div>
