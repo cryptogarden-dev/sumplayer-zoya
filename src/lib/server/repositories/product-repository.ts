@@ -159,6 +159,24 @@ export async function setProductActive(businessId: string, id: string, isActive:
 }
 
 /**
+ * Setel harga jual per satuan dasar saja (fitur "Rekomendasi Jual",
+ * 2026-11-13). Dipakai tombol "Pakai sebagai Harga Jual" — sengaja
+ * terpisah dari `updateProduct` supaya tidak perlu mengirim ulang seluruh
+ * field produk dan tidak menimpa edit form yang belum disimpan.
+ */
+export async function setSellPrice(
+  businessId: string,
+  id: string,
+  sellPricePerBaseUnit: number | null,
+) {
+  const result = await prisma.product.updateMany({
+    where: { id, businessId },
+    data: { sellPricePerBaseUnit },
+  });
+  return result.count > 0;
+}
+
+/**
  * Hapus PERMANEN satu produk (docs/BACKLOG.md #5). Hanya diizinkan jika
  * produk ini belum pernah dipakai di baris pesanan manapun
  * (`purchase_order_items`, dicek lewat relasi `SupplierProduct`) DAN tidak

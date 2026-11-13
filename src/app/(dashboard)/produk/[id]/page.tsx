@@ -9,6 +9,9 @@ import { listTaxRates } from "@/lib/server/repositories/tax-rate-repository";
 import { listOffers } from "@/lib/server/repositories/supplier-product-repository";
 import { listPurchasePriceHistory } from "@/lib/server/repositories/price-history-repository";
 import { computeCheapestBuyPricePerBaseUnit, computeMargin } from "@/lib/domain/pricing/margin";
+import { calculateSubtotal } from "@/lib/domain/pricing/subtotal";
+import { calculatePricePerBaseUnit } from "@/lib/domain/pricing/unit-price";
+import { SellRecommendation } from "@/components/produk/SellRecommendation";
 import { PriceHistoryTable } from "@/components/produk/PriceHistoryTable";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -84,6 +87,33 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   });
   const marginPercentFormatter = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
 
+  // Penawaran aktif berhaga untuk kartu "Rekomendasi Harga Jual" — harga
+  // per kemasan SETELAH pajak (sama seperti margin), diurutkan termurah
+  // dulu supaya penawaran termurah yang terpilih bawaan.
+  const recommendationOffers = offers
+    .filter((offer) => offer.isActive && offer.prices[0])
+    .map((offer) => {
+      const pricePerPackageAfterTax = calculateSubtotal({
+        packagesToBuy: 1,
+        pricePerPackage: offer.prices[0]!.pricePerPackage,
+        taxStatus: offer.prices[0]!.taxStatus,
+        taxRatePercent: offer.prices[0]!.taxRateValueSnapshot ?? 0,
+      }).pricePerPackageAfterTax;
+      return {
+        id: offer.id,
+        supplierName: offer.supplier.supplierName,
+        packageLabel: `${PACKAGING_TYPE_LABELS[offer.packageType]} · ${Number(offer.itemsPerPackage)} x ${Number(offer.contentPerItem)} ${MEASUREMENT_UNIT_LABELS[offer.contentUnit]} = ${Number(offer.totalPackageContent)} ${BASE_UNIT_LABELS[offer.baseUnit]}`,
+        pricePerPackageAfterTax: pricePerPackageAfterTax.toString(),
+        totalPackageContent: offer.totalPackageContent.toString(),
+        pricePerBaseUnit: calculatePricePerBaseUnit(
+          pricePerPackageAfterTax,
+          offer.totalPackageContent,
+        ).toNumber(),
+      };
+    })
+    .sort((a, b) => a.pricePerBaseUnit - b.pricePerBaseUnit)
+    .map(({ pricePerBaseUnit: _pricePerBaseUnit, ...offer }) => offer);
+
   return (
     <div>
       <BackLink href="/produk" label="Kembali ke Produk" />
@@ -148,6 +178,12 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             )}
           </p>
         </Card>
+
+        <SellRecommendation
+          productId={product.id}
+          baseUnitLabel={BASE_UNIT_LABELS[product.baseUnit]}
+          offers={recommendationOffers}
+        />
 
         <ProductEditForm
           product={{
