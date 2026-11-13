@@ -1,14 +1,16 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
-import { listLowStockProducts } from "@/lib/server/repositories/goods-receipt-repository";
-import type { Product } from "@generated/prisma/client";
+import {
+  listLowStockProducts,
+  type LowStockProduct,
+} from "@/lib/server/repositories/goods-receipt-repository";
 
 export interface DashboardSummary {
   supplierCount: number;
   productCount: number;
   activeOrderCount: number;
   /** Produk aktif yang stok tokonya sudah <= ambang peringatan (R18). */
-  lowStockProducts: Product[];
+  lowStockProducts: LowStockProduct[];
 }
 
 const INACTIVE_ORDER_STATUSES = ["DITERIMA", "DIBATALKAN"] as const;

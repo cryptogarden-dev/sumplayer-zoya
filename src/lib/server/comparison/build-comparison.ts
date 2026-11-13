@@ -424,7 +424,15 @@ export type SerializedComparisonResult = ReturnType<typeof serializeComparisonRe
 export type SerializedComparisonRow = SerializedComparisonResult["rows"][number];
 
 export async function buildComparison(input: BuildComparisonInput): Promise<ComparisonResult> {
-  const product = await getProductById(input.businessId, input.productId);
+  // Ketiga query ini tidak saling bergantung — dijalankan paralel
+  // (perbaikan kecepatan 2026-11-13; sebelumnya 3 round-trip berurutan).
+  // Kinerja supplier tetap sesudahnya karena butuh id supplier dari
+  // penawaran.
+  const [product, staleDataThresholdDays, offers] = await Promise.all([
+    getProductById(input.businessId, input.productId),
+    getStaleDataThresholdDays(input.businessId),
+    listOffersForComparison(input.businessId, input.productId),
+  ]);
   if (!product) {
     throw new ProductNotFoundError();
   }
@@ -435,9 +443,7 @@ export async function buildComparison(input: BuildComparisonInput): Promise<Comp
   // produk (mis. memilih "liter" untuk produk berbasis berat).
   assertSameFamily(neededBase.family, product.unitFamily);
 
-  const staleDataThresholdDays = await getStaleDataThresholdDays(input.businessId);
   const today = input.today ?? new Date();
-  const offers = await listOffersForComparison(input.businessId, input.productId);
   const performances = await listSupplierPerformances(
     input.businessId,
     Array.from(new Set(offers.map((offer) => offer.supplier.id))),

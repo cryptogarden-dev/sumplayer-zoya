@@ -101,7 +101,11 @@ export async function listSuppliers(businessId: string, filters: SupplierListFil
   return prisma.supplier.findMany({
     where,
     orderBy: { supplierName: "asc" },
-    include: { _count: { select: { supplierProducts: true } }, deliveryAreas: true },
+    // `deliveryAreas` sengaja TIDAK diikutkan (perbaikan kecepatan
+    // 2026-11-13): tidak ada halaman/API yang memakai area dari hasil
+    // daftar ini — detail supplier memakai `getSupplierById` yang
+    // memang memuatnya. Menghemat satu join per baris di tiap daftar.
+    include: { _count: { select: { supplierProducts: true } } },
   });
 }
 

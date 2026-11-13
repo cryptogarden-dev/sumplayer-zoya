@@ -44,6 +44,36 @@ export type PurchaseOrderWithDetails = Prisma.PurchaseOrderGetPayload<{
   include: typeof ORDER_DETAIL_INCLUDE;
 }>;
 
+/**
+ * Ringkasan pesanan untuk DAFTAR Pesanan (perbaikan kecepatan 2026-11-13).
+ * Daftar hanya butuh nomor, supplier, jumlah baris, total, dan status —
+ * `ORDER_DETAIL_INCLUDE` memuat SEMUA baris + penawaran + produk tiap
+ * pesanan, padahal total cukup dihitung dari snapshot baris
+ * (`effectiveLineTotal` hanya butuh 6 field baris). Query ini memangkas
+ * join berantai itu; detail lengkap tetap lewat `getPurchaseOrderById`.
+ */
+const ORDER_SUMMARY_SELECT = {
+  id: true,
+  orderNumber: true,
+  status: true,
+  createdAt: true,
+  supplier: { select: { supplierName: true } },
+  items: {
+    select: {
+      availabilityStatus: true,
+      confirmedPackageQty: true,
+      lineSubtotal: true,
+      pricePerPackageSnapshot: true,
+      taxStatusSnapshot: true,
+      taxRateValueSnapshot: true,
+    },
+  },
+} satisfies Prisma.PurchaseOrderSelect;
+
+export type PurchaseOrderSummary = Prisma.PurchaseOrderGetPayload<{
+  select: typeof ORDER_SUMMARY_SELECT;
+}>;
+
 export interface PurchaseOrderListFilters {
   status?: string;
   supplierId?: string;
@@ -72,6 +102,17 @@ export async function listPurchaseOrders(
   return prisma.purchaseOrder.findMany({
     where,
     include: ORDER_DETAIL_INCLUDE,
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+/** Daftar Pesanan versi ringan — lihat `ORDER_SUMMARY_SELECT`. */
+export async function listPurchaseOrderSummaries(
+  businessId: string,
+): Promise<PurchaseOrderSummary[]> {
+  return prisma.purchaseOrder.findMany({
+    where: { businessId },
+    select: ORDER_SUMMARY_SELECT,
     orderBy: { createdAt: "desc" },
   });
 }
@@ -112,7 +153,12 @@ export function effectiveLineTotal(
   return new Decimal(item.lineSubtotal);
 }
 
-export function computeOrderTotal(order: PurchaseOrderWithDetails): Decimal {
+/** Total pesanan — menerima detail lengkap ATAU ringkasan (perbaikan
+ * kecepatan 2026-11-13): `effectiveLineTotal` hanya butuh 6 field baris,
+ * jadi daftar Pesanan tidak perlu memuat detail lengkap. */
+export function computeOrderTotal(order: {
+  items: Array<Parameters<typeof effectiveLineTotal>[0]>;
+}): Decimal {
   return order.items.reduce((sum, item) => sum.plus(effectiveLineTotal(item)), new Decimal(0));
 }
 

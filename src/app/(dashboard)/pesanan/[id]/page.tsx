@@ -37,17 +37,20 @@ export default async function PesananDetailPage({ params }: PesananDetailPagePro
     );
   }
 
-  const availableOffers =
+  // Penawaran yang bisa ditambahkan (hanya DRAFT) dan catatan penerimaan
+  // tidak saling bergantung — dijalankan paralel (perbaikan kecepatan
+  // 2026-11-13; sebelumnya berurutan).
+  const [availableOffers, receipt] = await Promise.all([
     order.status === "DRAFT"
-      ? await listOffers(session.user.businessId, {
+      ? listOffers(session.user.businessId, {
           supplierId: order.supplierId,
           // Produk yang sudah dinonaktifkan tidak boleh ditawarkan untuk
           // ditambahkan ke pesanan baru (docs/BACKLOG.md #5).
           activeProductOnly: true,
         })
-      : [];
-
-  const receipt = await getGoodsReceiptByOrder(session.user.businessId, order.id);
+      : Promise.resolve([]),
+    getGoodsReceiptByOrder(session.user.businessId, order.id),
+  ]);
 
   return (
     <div>

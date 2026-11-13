@@ -497,3 +497,61 @@ semua lulus.
   `deletePurchaseOrder` (baru divalidasi lewat typecheck/lint/build; test
   suite yang ada, 232/232, semuanya LAMA dan tetap lulus tanpa perubahan).
   Disarankan ditambah test integrasi kalau ada waktu di sesi berikutnya.
+
+## 6. Kecepatan aplikasi ("sat set", 2026-11-13)
+
+Audit 2026-11-13 mencatat hampir semua halaman loading 8–10 detik.
+Penyebab, urut dari dampak terbesar (bukti di kode):
+
+1. **Jarak fungsi Vercel ke database (penyebab terbesar, belum
+   terkonfirmasi dari dashboard).** Tidak ada `vercel.json`, jadi fungsi
+   serverless jalan di region default Vercel (kemungkinan besar `iad1`,
+   Amerika) sementara database Supabase di Seoul (`ap-northeast-2`).
+   Setiap round-trip query menempuh ~200 ms; satu halaman melakukan
+   5–10 query berurutan/bertahap, jadi 2–4 detik habis hanya untuk
+   jarak, ditambah cold start + TLS ke pooler. Perbaikan: `vercel.json`
+   `{ "regions": ["sin1"] }` — fungsi pindah ke Singapura (~70–90 ms
+   ke Seoul), tanpa ganti paket Vercel. WAJIB dikonfirmasi dari
+   dashboard Vercel (Deployments → Function region) — bila ternyata
+   region sudah dekat, penyebab #1 ini gugur dan yang tersisa #2–#4.
+2. **Query berurutan yang sebenarnya independen.** `buildComparison`
+   menunggu produk → pengaturan → penawaran → kinerja (4 round-trip);
+   detail Produk dua ronde `Promise.all` padahal ronde kedua tidak
+   memakai hasil ronde pertama; detail Pesanan menunggu penawaran lalu
+   penerimaan. Semua diparalelkan (satu `Promise.all` per halaman).
+3. **Over-fetching daftar Pesanan.** Daftar memakai
+   `ORDER_DETAIL_INCLUDE` (semua baris + penawaran + produk tiap
+   pesanan) padahal hanya butuh jumlah baris + total. Tambah
+   `listPurchaseOrderSummaries` (select 6 field baris yang dipakai
+   `effectiveLineTotal`) + `computeOrderTotal` digeneralisasi ke
+   bentuk ringan itu.
+4. **Over-fetching lain.** `listSuppliers` selalu memuat
+   `deliveryAreas` padahal TIDAK ADA halaman/API yang memakainya dari
+   hasil daftar (detail memakai `getSupplierById`) — dihapus dari
+   daftar. `listLowStockProducts` mengambil seluruh kolom produk —
+   kini hanya 5 kolom yang dipakai Beranda.
+5. **Indeks yang hilang (migrasi `20261113170000_indeks_kecepatan`).**
+   `purchase_order_items(business_id)` — badge keranjang di layout
+   jalan di SETIAP halaman; `purchase_orders(business_id, created_at
+DESC)` — urutan daftar Pesanan; `products(business_id,
+product_name)` — urutan daftar Produk.
+6. **Sesi di-decode dua kali per request** (layout + halaman) —
+   `getCurrentSession` kini memakai React `cache()` per request.
+   (JWT, tanpa query database — dampak kecil, tapi gratis.)
+
+Yang SENGAJA tidak diubah: `force-dynamic` di semua halaman dashboard
+(data toko harus segar — tidak ada cache data); pool Prisma (`max: 5`,
+`idleTimeoutMillis: 10_000`) sudah konservatif dan benar untuk
+serverless + PgBouncer; gambar produk sudah `loading="lazy"` (pindah ke
+`next/image` ditunda — butuh `remotePatterns` Supabase, keuntungan
+kecil untuk katalog sekecil ini); tidak ganti region Supabase, paket
+Vercel, atau tambah Redis/Edge.
+
+Yang TIDAK bisa diukur lokal: waktu muat sesungguhnya (tidak ada
+database yang bisa dijangkau dari mesin ini; `prisma generate` gagal
+unduh engine). Ukur live setelah deploy: buka Beranda, Produk,
+Pesanan, Bandingkan, detail produk/pesanan — catat waktu dari klik
+sampai konten tampil, sekali saat dingin (tab baru setelah lama tidak
+dibuka) dan sekali saat hangat (navigasi berikutnya). Target hangat
+< ~2 detik; dingin akan tetap lebih lama (cold start serverless tidak
+bisa nol) tapi harus turun terasa dibanding 8–10 detik.

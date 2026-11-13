@@ -7,7 +7,7 @@ import {
 } from "@/lib/domain/receiving/goods-receipt";
 import { estimateOnTimeRate } from "@/lib/domain/performance/on-time-rate";
 import type { GoodsReceiptInput } from "@/lib/validation/goods-receipt";
-import type { Prisma } from "@generated/prisma/client";
+import type { Prisma, Product } from "@generated/prisma/client";
 
 /**
  * Penerimaan barang (R18) + kinerja supplier (R15, Tahap 5).
@@ -67,10 +67,24 @@ export async function listSupplierPerformances(businessId: string, supplierIds: 
  * Ambang NULL = tidak ada peringatan untuk produk itu. Perbandingan
  * stok vs ambang dilakukan di JS (Prisma `where` tidak bisa membandingkan
  * dua kolom) — data produk satu bisnis berskala kecil-menengah.
+ * Hanya kolom yang dipakai Beranda yang diambil (perbaikan kecepatan
+ * 2026-11-13), bukan seluruh baris produk.
  */
-export async function listLowStockProducts(businessId: string) {
+export type LowStockProduct = Pick<
+  Product,
+  "id" | "productName" | "stockQty" | "lowStockThreshold" | "baseUnit"
+>;
+
+export async function listLowStockProducts(businessId: string): Promise<LowStockProduct[]> {
   const products = await prisma.product.findMany({
     where: { businessId, isActive: true, lowStockThreshold: { not: null } },
+    select: {
+      id: true,
+      productName: true,
+      stockQty: true,
+      lowStockThreshold: true,
+      baseUnit: true,
+    },
     orderBy: { stockQty: "asc" },
   });
   return products.filter(

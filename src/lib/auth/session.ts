@@ -1,13 +1,20 @@
 import "server-only";
+import { cache } from "react";
 import { getServerSession, type Session } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/auth-options";
 import { hasRole } from "@/lib/auth/rbac";
 import type { BusinessUserRole } from "@generated/prisma/browser";
 
-export async function getCurrentSession(): Promise<Session | null> {
+/**
+ * Sesi dari JWT (NextAuth Credentials, tanpa query database). Di-cache
+ * per request (perbaikan kecepatan 2026-11-13): layout dashboard DAN
+ * halaman di bawahnya sama-sama memanggil `requireSession`, dan tanpa
+ * cache ini JWT di-decode dua kali per request.
+ */
+export const getCurrentSession = cache(async (): Promise<Session | null> => {
   return getServerSession(authOptions);
-}
+});
 
 /**
  * Mewajibkan sesi login. Mengarahkan ke /login jika belum masuk.

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requireSession } from "@/lib/auth/session";
 import {
-  listPurchaseOrders,
+  listPurchaseOrderSummaries,
   computeOrderTotal,
 } from "@/lib/server/repositories/purchase-order-repository";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -18,7 +18,10 @@ export const dynamic = "force-dynamic";
  */
 export default async function PesananPage() {
   const session = await requireSession();
-  const orders = await listPurchaseOrders(session.user.businessId);
+  // Daftar memakai ringkasan ringan (bukan detail lengkap): cukup untuk
+  // nomor, supplier, jumlah baris, total, dan status (perbaikan
+  // kecepatan 2026-11-13).
+  const orders = await listPurchaseOrderSummaries(session.user.businessId);
 
   return (
     <div>

@@ -250,6 +250,7 @@ model Product {
   @@index([businessId])
   @@index([businessId, isActive])
   @@index([businessId, barcode])
+  @@index([businessId, productName])
   @@map("products")
 }
 
@@ -640,6 +641,7 @@ model PurchaseOrder {
 
   @@unique([businessId, orderNumber])
   @@index([businessId, status])
+  @@index([businessId, createdAt(sort: Desc)])
   @@index([supplierId])
   @@map("purchase_orders")
 }
@@ -674,6 +676,7 @@ model PurchaseOrderItem {
   goodsReceiptItems GoodsReceiptItem[]
 
   @@unique([purchaseOrderId, supplierProductId])
+  @@index([businessId])
   @@index([purchaseOrderId])
   @@index([supplierProductId])
   @@map("purchase_order_items")

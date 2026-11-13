@@ -38,9 +38,18 @@ interface ProductDetailPageProps {
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const session = await requireSession();
   const { id } = await params;
-  const [product, categories] = await Promise.all([
+  // Keenam query di bawah hanya butuh businessId + id dari URL — tidak
+  // ada yang bergantung pada hasil query lain — jadi dijalankan dalam
+  // SATU Promise.all (perbaikan kecepatan 2026-11-13). Sebelumnya ada
+  // dua ronde berurutan (produk+kategori, lalu supplier+pajak+penawaran
+  // +riwayat), padahal ronde kedua tidak memakai hasil ronde pertama.
+  const [product, categories, suppliers, taxRates, offers, priceHistory] = await Promise.all([
     getProductById(session.user.businessId, id),
     listProductCategories(session.user.businessId),
+    listSuppliers(session.user.businessId),
+    listTaxRates(session.user.businessId),
+    listOffers(session.user.businessId, { productId: id, includeInactive: true }),
+    listPurchasePriceHistory(session.user.businessId, id),
   ]);
 
   if (!product) {
@@ -55,13 +64,6 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       </div>
     );
   }
-
-  const [suppliers, taxRates, offers, priceHistory] = await Promise.all([
-    listSuppliers(session.user.businessId),
-    listTaxRates(session.user.businessId),
-    listOffers(session.user.businessId, { productId: product.id, includeInactive: true }),
-    listPurchasePriceHistory(session.user.businessId, product.id),
-  ]);
 
   // Harga beli termurah per satuan dasar (setelah pajak) dari penawaran
   // aktif — dipakai untuk margin. Bila tidak ada, margin tidak tampil.
