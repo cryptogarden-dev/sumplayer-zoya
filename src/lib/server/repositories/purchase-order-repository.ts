@@ -250,6 +250,14 @@ export async function addPurchaseOrderItem(
           pricePerPackageSnapshot: latestPrice.pricePerPackage,
           taxStatusSnapshot: latestPrice.taxStatus,
           taxRateValueSnapshot: latestPrice.taxRateValueSnapshot,
+          // Kemasan ikut di-snapshot ulang bersama harga (perilaku yang sama:
+          // baris draft selalu mengikuti penawaran terkini).
+          packageTypeSnapshot: supplierProduct.packageType,
+          itemsPerPackageSnapshot: supplierProduct.itemsPerPackage.toString(),
+          contentPerItemSnapshot: supplierProduct.contentPerItem.toString(),
+          contentUnitSnapshot: supplierProduct.contentUnit,
+          totalPackageContentSnapshot: supplierProduct.totalPackageContent.toString(),
+          baseUnitSnapshot: supplierProduct.baseUnit,
           lineSubtotal: subtotal.subtotalAfterTax,
           notes: input.notes ?? existing.notes,
         },
@@ -265,6 +273,13 @@ export async function addPurchaseOrderItem(
         pricePerPackageSnapshot: latestPrice.pricePerPackage,
         taxStatusSnapshot: latestPrice.taxStatus,
         taxRateValueSnapshot: latestPrice.taxRateValueSnapshot,
+        // Snapshot kemasan penawaran SAAT baris ini dibuat.
+        packageTypeSnapshot: supplierProduct.packageType,
+        itemsPerPackageSnapshot: supplierProduct.itemsPerPackage.toString(),
+        contentPerItemSnapshot: supplierProduct.contentPerItem.toString(),
+        contentUnitSnapshot: supplierProduct.contentUnit,
+        totalPackageContentSnapshot: supplierProduct.totalPackageContent.toString(),
+        baseUnitSnapshot: supplierProduct.baseUnit,
         lineSubtotal: subtotal.subtotalAfterTax,
         notes: input.notes ?? null,
       },

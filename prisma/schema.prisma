@@ -438,6 +438,17 @@ model SupplierPrice {
   taxRateId            String?   @map("tax_rate_id") @db.Uuid
   taxRateValueSnapshot Decimal?  @map("tax_rate_value_snapshot") @db.Decimal(6, 3)
   priceSourceNote      String?   @map("price_source_note")
+  /// Snapshot kemasan penawaran SAAT entri ini dibuat (perbaikan tampilan
+  /// riwayat 2026-11-13): definisi kemasan penawaran bisa berubah
+  /// (mis. DUS -> PACK), tapi baris riwayat lama harus tetap menampilkan
+  /// kemasan + harga satuan yang berlaku saat itu. Diisi dari definisi
+  /// penawaran pada `createOffer` / `addPriceHistoryEntry`.
+  packageTypeSnapshot         PackagingType   @map("package_type_snapshot")
+  itemsPerPackageSnapshot     Decimal         @map("items_per_package_snapshot") @db.Decimal(14, 4)
+  contentPerItemSnapshot      Decimal         @map("content_per_item_snapshot") @db.Decimal(14, 4)
+  contentUnitSnapshot         MeasurementUnit @map("content_unit_snapshot")
+  totalPackageContentSnapshot Decimal         @map("total_package_content_snapshot") @db.Decimal(14, 4)
+  baseUnitSnapshot            BaseUnit        @map("base_unit_snapshot")
   createdAt            DateTime  @default(now()) @map("created_at")
   createdById          String    @map("created_by") @db.Uuid
 
@@ -661,6 +672,16 @@ model PurchaseOrderItem {
   pricePerPackageSnapshot Decimal                       @map("price_per_package_snapshot") @db.Decimal(18, 2)
   taxStatusSnapshot       TaxStatus                     @map("tax_status_snapshot")
   taxRateValueSnapshot    Decimal?                      @map("tax_rate_value_snapshot") @db.Decimal(6, 3)
+  /// Snapshot kemasan penawaran SAAT baris ini dibuat (perbaikan tampilan
+  /// riwayat 2026-11-13): sama seperti harga/pajak, kemasan juga di-snapshot
+  /// agar baris PEMBELIAN di riwayat tidak ikut berubah bila definisi
+  /// kemasan penawaran diubah belakangan.
+  packageTypeSnapshot         PackagingType   @map("package_type_snapshot")
+  itemsPerPackageSnapshot     Decimal         @map("items_per_package_snapshot") @db.Decimal(14, 4)
+  contentPerItemSnapshot      Decimal         @map("content_per_item_snapshot") @db.Decimal(14, 4)
+  contentUnitSnapshot         MeasurementUnit @map("content_unit_snapshot")
+  totalPackageContentSnapshot Decimal         @map("total_package_content_snapshot") @db.Decimal(14, 4)
+  baseUnitSnapshot            BaseUnit        @map("base_unit_snapshot")
   lineSubtotal            Decimal                       @map("line_subtotal") @db.Decimal(18, 2)
   availabilityStatus      PurchaseOrderItemAvailability @default(BELUM_DIKONFIRMASI) @map("availability_status")
   /// Diisi hanya ketika `availabilityStatus = SEBAGIAN` - jumlah kemasan

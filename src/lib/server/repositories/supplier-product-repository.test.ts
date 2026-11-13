@@ -7,6 +7,7 @@ import {
 } from "@/tests/db-helpers";
 import { createSupplier } from "@/lib/server/repositories/supplier-repository";
 import { createProduct } from "@/lib/server/repositories/product-repository";
+import { listPurchasePriceHistory } from "@/lib/server/repositories/price-history-repository";
 import {
   addPriceHistoryEntry,
   createOffer,
@@ -249,6 +250,63 @@ describe("supplier-product-repository", () => {
 
     const history = await getPriceHistory(ctx.businessId, offer.id);
     expect(history).toHaveLength(1);
+  });
+
+  it("riwayat harga menyimpan snapshot kemasan: baris lama tetap Dus setelah definisi diubah", async () => {
+    // Regresi untuk bug tampilan riwayat Mayora (Nov 2026): baris lama ikut
+    // tampil sebagai kemasan baru + harga satuan dihitung pakai isi kemasan
+    // baru. Setelah perbaikan, tiap baris menyimpan kemasannya sendiri.
+    // Produk baru di sini supaya riwayatnya hanya berisi penawaran tes ini
+    // (productId bersama dipakai tes lain di file ini).
+    const snapshotProduct = await createProduct(ctx.businessId, ctx.ownerUserId, {
+      sku: "BERAS-SNAPSHOT",
+      productName: "Beras Snapshot",
+      unitFamily: "WEIGHT",
+    } as ProductInput);
+    const offer = await createOffer(
+      ctx.businessId,
+      ctx.ownerUserId,
+      baseOfferInput({
+        supplierId,
+        productId: snapshotProduct.id,
+        packageType: "DUS",
+        itemsPerPackage: 12,
+        contentPerItem: 1,
+        contentUnit: "KILOGRAM",
+        price: { pricePerPackage: 120000, taxStatus: "NONE" },
+      }),
+    );
+    if (!offer) throw new Error("offer gagal dibuat");
+
+    await updateOfferDefinition(ctx.businessId, offer.id, {
+      packageType: "KARUNG",
+      itemsPerPackage: 1,
+      contentPerItem: 50,
+      contentUnit: "KILOGRAM",
+      minPurchasePackages: 1,
+      purchaseMultiplePackages: 1,
+    });
+    await addPriceHistoryEntry(ctx.businessId, ctx.ownerUserId, offer.id, {
+      pricePerPackage: 300000,
+      taxStatus: "NONE",
+    });
+
+    const rows = await listPurchasePriceHistory(ctx.businessId, snapshotProduct.id);
+    expect(rows).toHaveLength(2);
+    const [latest, oldest] = rows;
+    // Baris baru: Karung 50 kg, Rp6.000/kg.
+    expect(latest?.packageType).toBe("KARUNG");
+    expect(Number(latest?.totalPackageContent)).toBe(50);
+    expect(Number(latest?.pricePerBaseUnit)).toBe(6000);
+    // Baris lama: TETAP Dus 12 kg, Rp10.000/kg (bukan Karung, bukan Rp2.400/kg).
+    expect(oldest?.packageType).toBe("DUS");
+    expect(Number(oldest?.totalPackageContent)).toBe(12);
+    expect(Number(oldest?.pricePerBaseUnit)).toBe(10000);
+    expect(oldest?.change).toBeNull();
+    // Perubahan baris baru vs baris lama dihitung dari harga satuan
+    // masing-masing: Rp10.000 -> Rp6.000 = TURUN Rp4.000 (40%).
+    expect(latest?.change?.direction).toBe("TURUN");
+    expect(Number(latest?.change?.amountChange)).toBe(-4000);
   });
 
   it("isolasi data antar-bisnis: penawaran bisnis A tidak terlihat/tidak dapat diubah dari bisnis B", async () => {

@@ -113,6 +113,19 @@ export async function listPurchasePriceHistory(
 
   for (const offer of offers) {
     for (const price of offer.prices) {
+      // Kemasan diambil dari SNAPSHOT saat entri harga ini dibuat, bukan dari
+      // definisi penawaran saat ini (definisi bisa berubah, mis. DUS -> PACK;
+      // baris lama harus tetap menampilkan kemasan + harga satuan saat itu).
+      // Fallback ke definisi saat ini hanya untuk baris yang dibuat sebelum
+      // migrasi snapshot (seharusnya sudah ter-backfill).
+      const packageType = price.packageTypeSnapshot ?? offer.packageType;
+      const itemsPerPackage = new Decimal(price.itemsPerPackageSnapshot ?? offer.itemsPerPackage);
+      const contentPerItem = new Decimal(price.contentPerItemSnapshot ?? offer.contentPerItem);
+      const contentUnit = price.contentUnitSnapshot ?? offer.contentUnit;
+      const totalPackageContent = new Decimal(
+        price.totalPackageContentSnapshot ?? offer.totalPackageContent,
+      );
+      const baseUnit = price.baseUnitSnapshot ?? offer.baseUnit;
       rows.push({
         id: `penawaran-${price.id}`,
         date: price.createdAt,
@@ -120,19 +133,19 @@ export async function listPurchasePriceHistory(
         supplierProductId: offer.id,
         supplierName: offer.supplier.supplierName,
         orderNumber: null,
-        packageType: offer.packageType,
-        itemsPerPackage: new Decimal(offer.itemsPerPackage),
-        contentPerItem: new Decimal(offer.contentPerItem),
-        contentUnit: offer.contentUnit,
-        totalPackageContent: new Decimal(offer.totalPackageContent),
-        baseUnit: offer.baseUnit,
+        packageType,
+        itemsPerPackage,
+        contentPerItem,
+        contentUnit,
+        totalPackageContent,
+        baseUnit,
         taxStatus: price.taxStatus,
         pricePerPackage: new Decimal(price.pricePerPackage),
         pricePerBaseUnit: pricePerBaseUnitAfterTax(
           price.pricePerPackage,
           price.taxStatus,
           price.taxRateValueSnapshot,
-          offer.totalPackageContent,
+          totalPackageContent,
         ),
         change: null,
       });
@@ -140,6 +153,19 @@ export async function listPurchasePriceHistory(
   }
 
   for (const item of orderItems) {
+    // Sama: kemasan dari snapshot saat baris pesanan dibuat.
+    const packageType = item.packageTypeSnapshot ?? item.supplierProduct.packageType;
+    const itemsPerPackage = new Decimal(
+      item.itemsPerPackageSnapshot ?? item.supplierProduct.itemsPerPackage,
+    );
+    const contentPerItem = new Decimal(
+      item.contentPerItemSnapshot ?? item.supplierProduct.contentPerItem,
+    );
+    const contentUnit = item.contentUnitSnapshot ?? item.supplierProduct.contentUnit;
+    const totalPackageContent = new Decimal(
+      item.totalPackageContentSnapshot ?? item.supplierProduct.totalPackageContent,
+    );
+    const baseUnit = item.baseUnitSnapshot ?? item.supplierProduct.baseUnit;
     rows.push({
       id: `pembelian-${item.id}`,
       date: item.purchaseOrder.confirmedAt ?? item.purchaseOrder.createdAt,
@@ -147,19 +173,19 @@ export async function listPurchasePriceHistory(
       supplierProductId: item.supplierProductId,
       supplierName: item.purchaseOrder.supplier.supplierName,
       orderNumber: item.purchaseOrder.orderNumber,
-      packageType: item.supplierProduct.packageType,
-      itemsPerPackage: new Decimal(item.supplierProduct.itemsPerPackage),
-      contentPerItem: new Decimal(item.supplierProduct.contentPerItem),
-      contentUnit: item.supplierProduct.contentUnit,
-      totalPackageContent: new Decimal(item.supplierProduct.totalPackageContent),
-      baseUnit: item.supplierProduct.baseUnit,
+      packageType,
+      itemsPerPackage,
+      contentPerItem,
+      contentUnit,
+      totalPackageContent,
+      baseUnit,
       taxStatus: item.taxStatusSnapshot,
       pricePerPackage: new Decimal(item.pricePerPackageSnapshot),
       pricePerBaseUnit: pricePerBaseUnitAfterTax(
         item.pricePerPackageSnapshot,
         item.taxStatusSnapshot,
         item.taxRateValueSnapshot,
-        item.supplierProduct.totalPackageContent,
+        totalPackageContent,
       ),
       change: null,
     });

@@ -224,6 +224,14 @@ export async function createOffer(businessId: string, userId: string, input: Sup
         taxRateId: taxSnapshot.taxRateId,
         taxRateValueSnapshot: taxSnapshot.taxRateValueSnapshot,
         priceSourceNote: input.price.priceSourceNote ?? null,
+        // Snapshot kemasan saat entri ini dibuat (riwayat tidak boleh ikut
+        // berubah bila definisi kemasan penawaran diubah belakangan).
+        packageTypeSnapshot: resolved.packagingType,
+        itemsPerPackageSnapshot: resolved.itemsPerPackage.toString(),
+        contentPerItemSnapshot: resolved.contentPerItem.toString(),
+        contentUnitSnapshot: resolved.contentUnit,
+        totalPackageContentSnapshot: resolved.totalContentInBaseUnit.toString(),
+        baseUnitSnapshot: resolved.baseUnit,
         createdById: userId,
       },
     });
@@ -352,6 +360,14 @@ export async function addPriceHistoryEntry(
         taxRateId: taxSnapshot.taxRateId,
         taxRateValueSnapshot: taxSnapshot.taxRateValueSnapshot,
         priceSourceNote: input.priceSourceNote ?? null,
+        // Snapshot kemasan penawaran SAAT entri ini dibuat (riwayat tidak
+        // boleh ikut berubah bila definisi kemasan diubah belakangan).
+        packageTypeSnapshot: offer.packageType,
+        itemsPerPackageSnapshot: offer.itemsPerPackage.toString(),
+        contentPerItemSnapshot: offer.contentPerItem.toString(),
+        contentUnitSnapshot: offer.contentUnit,
+        totalPackageContentSnapshot: offer.totalPackageContent.toString(),
+        baseUnitSnapshot: offer.baseUnit,
         createdById: userId,
       },
       include: { taxRate: true },
