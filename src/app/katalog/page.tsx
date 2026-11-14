@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/db/prisma";
 import { listProducts } from "@/lib/server/repositories/product-repository";
 import { LogoZoya } from "@/components/app-shell/LogoZoya";
 import { EmptyState } from "@/components/ui/EmptyState";
