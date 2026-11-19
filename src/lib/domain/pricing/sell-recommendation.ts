@@ -118,7 +118,14 @@ export function computeSuggestedSellPrice(input: SuggestedSellPriceInput): Money
  *   "kg"): harga per satuan jual sudah sama dengan harga per satuan dasar.
  * - Bila BERBEDA (mis. jual per "cup", satuan dasar "pcs" = dus):
  *   harga per satuan dasar = harga per satuan jual × isi per kemasan
- *   (mis. Rp1.000/cup × 24 = Rp24.000/pcs).
+ *   ÷ isi kemasan dalam satuan dasar (mis. Rp1.000/cup × 24 ÷ 1 =
+ *   Rp24.000/pcs; Rp2.875/250 gram × 1 ÷ 0,25 = Rp11.500/kg).
+ *
+ * Pembagi itu penting bila kemasan BUKAN 1 satuan dasar — mis. bungkus
+ * 250 gram (isi kemasan 0,25 kg): tanpa pembagi, harga per bungkus
+ * tersimpan apa adanya sebagai harga per kg (salah 4×). Bila
+ * `totalPackageContent` tidak diisi, dianggap 1 (kemasan = 1 satuan
+ * dasar) sehingga perilaku lama tidak berubah.
  *
  * Perbandingan label tidak peka huruf besar/kecil dan spasi ujung.
  * Hasil dibulatkan ke Rupiah bulat (round half up) karena inilah nilai
@@ -129,13 +136,19 @@ export function computeSellPricePerBaseUnit(input: {
   contentsPerPackage: Decimal.Value;
   sellUnitLabel: string;
   baseUnitLabel: string;
+  /** Isi kemasan dalam satuan dasar (mis. 0,25 untuk bungkus 250 gram). Default 1. */
+  totalPackageContent?: Decimal.Value;
 }): Money {
   const sellPerUnit = money(input.sellPricePerSellUnit, "Harga jual per satuan");
   const contents = assertPositiveQuantity(input.contentsPerPackage, "Isi per kemasan");
+  const packageContent =
+    input.totalPackageContent === undefined
+      ? new Decimal(1)
+      : assertPositiveQuantity(input.totalPackageContent, "Isi kemasan");
 
   const sameUnit =
     input.sellUnitLabel.trim().toLowerCase() === input.baseUnitLabel.trim().toLowerCase();
 
-  const perBaseUnit = sameUnit ? sellPerUnit : sellPerUnit.mul(contents);
+  const perBaseUnit = sameUnit ? sellPerUnit : sellPerUnit.mul(contents).div(packageContent);
   return roundMoney(perBaseUnit, 0);
 }

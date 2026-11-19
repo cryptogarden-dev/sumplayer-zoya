@@ -160,4 +160,37 @@ describe("computeSellPricePerBaseUnit", () => {
     });
     expect(perBaseUnit.toNumber()).toBe(25000);
   });
+
+  it("kemasan 250 gram (0,25 kg), jual per 250 gram → 2.875 × 1 ÷ 0,25 = 11.500/kg", () => {
+    const perBaseUnit = computeSellPricePerBaseUnit({
+      sellPricePerSellUnit: 2875,
+      contentsPerPackage: 1,
+      sellUnitLabel: "250 gram",
+      baseUnitLabel: "kg",
+      totalPackageContent: 0.25,
+    });
+    expect(perBaseUnit.toNumber()).toBe(11500);
+  });
+
+  it("kemasan 1 kg, jual per 250 gram (isi 4) → 6.613 × 4 ÷ 1 = 26.452/kg", () => {
+    const perBaseUnit = computeSellPricePerBaseUnit({
+      sellPricePerSellUnit: 6613,
+      contentsPerPackage: 4,
+      sellUnitLabel: "250 gram",
+      baseUnitLabel: "kg",
+      totalPackageContent: 1,
+    });
+    expect(perBaseUnit.toNumber()).toBe(26452);
+  });
+
+  it("kemasan 5 kg, jual per 250 gram (isi 20) → 2.875 × 20 ÷ 5 = 11.500/kg", () => {
+    const perBaseUnit = computeSellPricePerBaseUnit({
+      sellPricePerSellUnit: 2875,
+      contentsPerPackage: 20,
+      sellUnitLabel: "250 gram",
+      baseUnitLabel: "kg",
+      totalPackageContent: 5,
+    });
+    expect(perBaseUnit.toNumber()).toBe(11500);
+  });
 });

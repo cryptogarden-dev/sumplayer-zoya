@@ -32,13 +32,32 @@ export interface SellRecommendationOffer {
 const percentFormatter = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
 
 /**
+ * Label satuan kemasan dari isi kemasan dalam satuan dasar — mis. 0,25 kg
+ * → "250 gram", 1 kg → "kg", 5 kg → "5 kg". Dipakai supaya bawaan kartu
+ * ini "jual per kemasan" (bukan "jual per kg" yang diisi 0,25 — itu yang
+ * membingungkan: 0,25 di kolom isi + satuan kg dibaca sebagai 0,25
+ * satuan jual per kemasan).
+ */
+function packageUnitLabel(totalPackageContent: string, baseUnitLabel: string): string {
+  if (baseUnitLabel !== "kg") return baseUnitLabel;
+  const pkgKg = Number(totalPackageContent);
+  if (!Number.isFinite(pkgKg) || pkgKg <= 0) return baseUnitLabel;
+  if (pkgKg === 1) return "kg";
+  if (pkgKg < 1) return `${Math.round(pkgKg * 1000)} gram`;
+  return `${pkgKg} kg`;
+}
+
+/**
  * Kartu "Rekomendasi Harga Jual" (2026-11-13).
  *
  * Alur: pilih penawaran beli → ketik isi per kemasan dan satuan jualnya
  * (mis. Teh Gelas: 24 cup per dus) → pilih mode hitung: ketik harga jual
  * per satuan dan lihat untungnya, ATAU ketik target untung % dan lihat
  * saran harga jualnya → tombol "Pakai sebagai Harga Jual" menyimpan
- * harga jual produk (per satuan dasar).
+ * harga jual produk (per satuan dasar). Untuk produk timbangan ada
+ * pilihan cepat "Jual per" (250 gram, 500 gram, ...) yang mengisi isi +
+ * satuan sekaligus — harga yang sudah diketik ikut menyesuaikan supaya
+ * harga per kg tetap sama, jadi tidak perlu hitung ulang dari awal.
  */
 export function SellRecommendation({
   productId,
@@ -51,8 +70,12 @@ export function SellRecommendation({
 }) {
   const router = useRouter();
   const [selectedOfferId, setSelectedOfferId] = useState(offers[0]?.id ?? "");
-  const [contents, setContents] = useState(offers[0]?.totalPackageContent ?? "");
-  const [sellUnitLabel, setSellUnitLabel] = useState(baseUnitLabel);
+  // Bawaan: jual per kemasan utuh (isi 1, satuan = kemasan) — mis. Terigu
+  // langsung "1 × 250 gram", bukan "0,25 × kg".
+  const [contents, setContents] = useState("1");
+  const [sellUnitLabel, setSellUnitLabel] = useState(() =>
+    packageUnitLabel(offers[0]?.totalPackageContent ?? "", baseUnitLabel),
+  );
   const [mode, setMode] = useState<"price" | "percent">("price");
   const [sellPriceInput, setSellPriceInput] = useState("");
   const [targetPercentInput, setTargetPercentInput] = useState("20");
@@ -65,9 +88,75 @@ export function SellRecommendation({
   function handleOfferChange(offerId: string) {
     const offer = offers.find((item) => item.id === offerId);
     setSelectedOfferId(offerId);
-    // Isi dan satuan kembali ke bawaan penawaran yang dipilih.
-    setContents(offer?.totalPackageContent ?? "");
-    setSellUnitLabel(baseUnitLabel);
+    // Isi dan satuan kembali ke bawaan penawaran yang dipilih (jual per kemasan).
+    setContents("1");
+    setSellUnitLabel(packageUnitLabel(offer?.totalPackageContent ?? "", baseUnitLabel));
+    setSuccessMessage(null);
+    setApplyError(null);
+  }
+
+  /**
+   * Pilihan cepat "Jual per" untuk produk timbangan (kg): per kemasan,
+   * 100/250/500 gram, 1 kg — hanya yang membagi kemasan jadi bungkus
+   * utuh (mis. kemasan 1 kg → 250 gram = isi 4; kemasan 250 gram cuma
+   * punya "Per kemasan"). Harga yang sudah diketik ikut menyesuaikan
+   * supaya harga per kg tetap sama.
+   */
+  const splitOptions = useMemo(() => {
+    if (!selectedOffer || baseUnitLabel !== "kg") return [];
+    const pkgKg = Number(selectedOffer.totalPackageContent);
+    if (!Number.isFinite(pkgKg) || pkgKg <= 0) return [];
+    const options: { key: string; label: string; contents: number; unit: string }[] = [
+      {
+        key: "package",
+        label: "Per kemasan",
+        contents: 1,
+        unit: packageUnitLabel(selectedOffer.totalPackageContent, baseUnitLabel),
+      },
+    ];
+    for (const grams of [100, 250, 500, 1000]) {
+      const contents = pkgKg / (grams / 1000);
+      if (Number.isInteger(contents) && contents >= 1) {
+        options.push({
+          key: `${grams}g`,
+          label: grams >= 1000 ? "1 kg" : `${grams} gram`,
+          contents,
+          unit: grams >= 1000 ? "kg" : `${grams} gram`,
+        });
+      }
+    }
+    // "Per kemasan" bisa sama persis dengan salah satu gram (mis. kemasan
+    // 1 kg = "1 kg", kemasan 250 gram = "250 gram") — tampilkan sekali saja.
+    return options.filter(
+      (option, index) =>
+        options.findIndex(
+          (other) => other.contents === option.contents && other.unit === option.unit,
+        ) === index,
+    );
+  }, [selectedOffer, baseUnitLabel]);
+
+  const activeSplitKey =
+    splitOptions.find(
+      (option) =>
+        Number(contents) === option.contents &&
+        sellUnitLabel.trim().toLowerCase() === option.unit.toLowerCase(),
+    )?.key ?? null;
+
+  function applySellSplit(nextContents: number, nextUnit: string) {
+    const oldContents = Number(contents);
+    const oldPrice = Number(sellPriceInput);
+    if (
+      sellPriceInput.trim() !== "" &&
+      Number.isFinite(oldPrice) &&
+      Number.isFinite(oldContents) &&
+      oldContents > 0 &&
+      nextContents > 0
+    ) {
+      // Harga per satuan jual ikut menyesuaikan supaya harga per kg tetap sama.
+      setSellPriceInput(String(Math.round((oldPrice * oldContents) / nextContents)));
+    }
+    setContents(String(nextContents));
+    setSellUnitLabel(nextUnit);
     setSuccessMessage(null);
     setApplyError(null);
   }
@@ -112,6 +201,7 @@ export function SellRecommendation({
         contentsPerPackage: contentsNum,
         sellUnitLabel,
         baseUnitLabel,
+        totalPackageContent: selectedOffer.totalPackageContent,
       });
       return { result, sellPerUnit, perBaseUnit };
     } catch (error) {
@@ -218,6 +308,31 @@ export function SellRecommendation({
           </p>
         )}
 
+        {splitOptions.length > 0 ? (
+          <div>
+            <Label>Jual per</Label>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {splitOptions.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => applySellSplit(option.contents, option.unit)}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    activeSplitKey === option.key
+                      ? "border-slate bg-slate text-white"
+                      : "border-divider text-slate hover:border-cloud bg-white"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              Pilih bungkus jualnya — isi dan harga ikut menyesuaikan, tidak perlu hitung ulang.
+            </p>
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="sellRecommendationContents">Isi per kemasan</Label>
@@ -233,7 +348,7 @@ export function SellRecommendation({
               }}
             />
             <p className="mt-1 text-xs text-slate-400">
-              Jumlah satuan jual dalam 1 kemasan (mis. 24 cup per dus).
+              Jumlah bungkus jual dalam 1 kemasan beli (mis. 1 kg jadi 4 bungkus 250 gram → isi 4).
             </p>
           </div>
           <div>
@@ -359,25 +474,17 @@ export function SellRecommendation({
 
         {calculation.perBaseUnit ? (
           <p className="text-sm text-slate-600">
-            {sameUnit ? (
+            Harga jual produk akan disetel ke{" "}
+            <span className="font-semibold text-slate-900">
+              {formatRupiah(calculation.perBaseUnit.toNumber())}/{baseUnitLabel}
+            </span>
+            {sameUnit ? null : (
               <>
-                Harga jual produk akan disetel ke{" "}
-                <span className="font-semibold text-slate-900">
-                  {formatRupiah(calculation.perBaseUnit.toNumber())}/{baseUnitLabel}
-                </span>
-                .
-              </>
-            ) : (
-              <>
-                Harga jual produk akan disetel ke{" "}
-                <span className="font-semibold text-slate-900">
-                  {formatRupiah(calculation.sellPerUnit ?? 0)}/{sellUnitLabel.trim()} ×{" "}
-                  {Number(contents)} = {formatRupiah(calculation.perBaseUnit.toNumber())}/
-                  {baseUnitLabel}
-                </span>
-                .
+                {" "}
+                (dari {formatRupiah(calculation.sellPerUnit ?? 0)}/{sellUnitLabel.trim()})
               </>
             )}
+            .
           </p>
         ) : null}
 
