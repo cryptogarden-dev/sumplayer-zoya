@@ -66,6 +66,7 @@ model Business {
   goodsReceipts             GoodsReceipt[]
   goodsReceiptItems         GoodsReceiptItem[]
   supplierPerformances      SupplierPerformance[]
+  stockMovements            StockMovement[]
 
   @@map("businesses")
 }
@@ -92,6 +93,7 @@ model User {
   createdShippingRules    ShippingRule[]
   createdPurchaseOrders   PurchaseOrder[]
   createdGoodsReceipts    GoodsReceipt[]
+  createdStockMovements   StockMovement[]
 
   @@map("users")
 }
@@ -235,6 +237,10 @@ model Product {
   /// Harga jual per satuan dasar produk (perbaikan #5, 2026-11-13).
   /// NULL = belum diatur — margin tidak ditampilkan (bukan 0).
   sellPricePerBaseUnit Decimal? @map("sell_price_per_base_unit") @db.Decimal(18, 2)
+  /// Harga jual eceran per satuan dasar (mis. per sachet saat jual per
+  /// pcs). NULL = tidak ada harga eceran — jual per pcs memakai harga
+  /// jual per satuan dasar. Dipakai fitur Stok Fleksibel 2026-11-19.
+  eceranPricePerBaseUnit Decimal? @map("eceran_price_per_base_unit") @db.Decimal(18, 2)
   notes       String?
   isActive    Boolean    @default(true) @map("is_active")
   createdAt   DateTime   @default(now()) @map("created_at")
@@ -245,6 +251,7 @@ model Product {
   category         ProductCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   createdBy        User              @relation(fields: [createdById], references: [id])
   supplierProducts SupplierProduct[]
+  stockMovements   StockMovement[]
 
   @@unique([businessId, sku])
   @@index([businessId])
@@ -785,4 +792,45 @@ model SupplierPerformance {
 
   @@index([supplierId])
   @@map("supplier_performance")
+}
+
+// ---------------------------------------------------------------------------
+// Stok Fleksibel: harga jual eceran + riwayat pergerakan stok (2026-11-19)
+// ---------------------------------------------------------------------------
+
+/// Jenis pergerakan stok.
+enum StockMovementType {
+  PENJUALAN
+  PENYESUAIAN
+}
+
+/// Riwayat pergerakan stok toko, APPEND-ONLY. Setiap penjualan (dialog
+/// Jual di Stok Toko) dan setiap penyesuaian stok manual (tombol +/- di
+/// Stok Toko) menulis satu baris di sini — stok produk sendiri tetap di
+/// `products.stock_qty`. `quantityDeltaBase` bertanda: negatif saat stok
+/// berkurang (penjualan / pengurangan), positif saat bertambah.
+/// `unitQuantity` + `unitLabel` mencatat satuan yang dipilih pengguna
+/// (mis. 2 Renceng), `unitPrice` + `totalAmount` hanya diisi untuk
+/// PENJUALAN.
+model StockMovement {
+  id                String            @id @default(uuid()) @db.Uuid
+  businessId        String            @map("business_id") @db.Uuid
+  productId         String            @map("product_id") @db.Uuid
+  type              StockMovementType
+  quantityDeltaBase Decimal           @map("quantity_delta_base") @db.Decimal(14, 4)
+  unitLabel         String            @map("unit_label")
+  unitQuantity      Decimal           @map("unit_quantity") @db.Decimal(14, 4)
+  unitPrice         Decimal?          @map("unit_price") @db.Decimal(18, 2)
+  totalAmount       Decimal?          @map("total_amount") @db.Decimal(18, 2)
+  note              String?
+  createdAt         DateTime          @default(now()) @map("created_at")
+  createdById       String            @map("created_by") @db.Uuid
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@index([businessId, productId, createdAt(sort: Desc)])
+  @@index([businessId, createdAt(sort: Desc)])
+  @@map("stock_movements")
 }

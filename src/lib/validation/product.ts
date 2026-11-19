@@ -41,6 +41,14 @@ export const productInputSchema = z.object({
     .nonnegative("Harga jual tidak boleh negatif")
     .nullable()
     .optional(),
+  /** Harga jual eceran per satuan dasar (Stok Fleksibel 2026-11-19).
+   * `null` = tidak ada harga eceran — jual per pcs memakai harga jual
+   * per satuan dasar. Hanya bermakna untuk produk hitungan (COUNT). */
+  eceranPricePerBaseUnit: z
+    .number()
+    .nonnegative("Harga jual eceran tidak boleh negatif")
+    .nullable()
+    .optional(),
 });
 
 export type ProductInput = z.infer<typeof productInputSchema>;

@@ -25,11 +25,13 @@ import { OfferForm } from "@/components/produk/OfferForm";
 import { formatRupiah } from "@/lib/format/currency";
 import {
   AVAILABILITY_STATUS_LABELS,
+  BASE_UNIT_LABELS,
   displayUnitLabel,
   MEASUREMENT_UNIT_LABELS,
   PACKAGING_TYPE_LABELS,
   TAX_STATUS_LABELS,
 } from "@/lib/format/units";
+import { displayPackageContent, toDisplayQty } from "@/lib/domain/stock/package-qty";
 
 export const metadata: Metadata = { title: "Detail Produk" };
 export const dynamic = "force-dynamic";
@@ -94,6 +96,18 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     product.baseUnit,
     offers.filter((offer) => offer.isActive),
   );
+  const baseUnitLabel = BASE_UNIT_LABELS[product.baseUnit];
+  // Isi satu renceng dalam satuan dasar (10 untuk Kopi Good Day: 1
+  // renceng = 10 pcs), 1 bila produk tidak dijual per renceng.
+  const displayContent = displayPackageContent(
+    offers
+      .filter((offer) => offer.isActive)
+      .map((offer) => ({
+        packageType: offer.packageType,
+        totalPackageContent: Number(offer.totalPackageContent),
+        pricePerPackage: offer.prices[0] ? Number(offer.prices[0].pricePerPackage) : undefined,
+      })),
+  );
 
   // Dipakai dua kali di bawah (form ubah per penawaran + form tambah) -
   // dihitung sekali supaya tidak menduplikasi map yang sama.
@@ -140,8 +154,14 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           <p className="text-sm text-slate-600">
             Stok toko:{" "}
             <span className="font-semibold text-slate-900">
-              {Number(product.stockQty)} {displayUnit}
+              {toDisplayQty(Number(product.stockQty), displayContent)} {displayUnit}
             </span>
+            {displayContent > 1 ? (
+              <span className="text-slate-500">
+                {" "}
+                ({Number(product.stockQty)} {baseUnitLabel})
+              </span>
+            ) : null}
             {product.lowStockThreshold !== null &&
             Number(product.stockQty) <= Number(product.lowStockThreshold) ? (
               <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
@@ -162,17 +182,37 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             Harga jual:{" "}
             <span className="font-semibold text-slate-900">
               {product.sellPricePerBaseUnit !== null
-                ? `${formatRupiah(Number(product.sellPricePerBaseUnit))}/${displayUnit}`
+                ? `${formatRupiah(Number(product.sellPricePerBaseUnit) * displayContent)}/${displayUnit}`
                 : "— (belum diatur)"}
             </span>
+            {displayContent > 1 && product.sellPricePerBaseUnit !== null ? (
+              <span className="text-slate-500">
+                {" "}
+                ({formatRupiah(Number(product.sellPricePerBaseUnit))}/{baseUnitLabel})
+              </span>
+            ) : null}
           </p>
+          {product.eceranPricePerBaseUnit !== null && product.unitFamily === "COUNT" ? (
+            <p className="mt-1 text-sm text-slate-600">
+              Harga jual eceran:{" "}
+              <span className="font-semibold text-slate-900">
+                {formatRupiah(Number(product.eceranPricePerBaseUnit))}/{baseUnitLabel}
+              </span>
+            </p>
+          ) : null}
           <p className="mt-1 text-sm text-slate-600">
             Harga beli termurah:{" "}
             <span className="font-semibold text-slate-900">
               {cheapestBuy
-                ? `${formatRupiah(Number(cheapestBuy.pricePerBaseUnit))}/${displayUnit} (${cheapestBuy.supplierName})`
+                ? `${formatRupiah(Number(cheapestBuy.pricePerBaseUnit) * displayContent)}/${displayUnit} (${cheapestBuy.supplierName})`
                 : "— (belum ada penawaran)"}
             </span>
+            {displayContent > 1 && cheapestBuy ? (
+              <span className="text-slate-500">
+                {" "}
+                ({formatRupiah(Number(cheapestBuy.pricePerBaseUnit))}/{baseUnitLabel})
+              </span>
+            ) : null}
           </p>
           <p className="mt-1 text-sm text-slate-600">
             Margin:{" "}
@@ -184,7 +224,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                     : "font-semibold text-emerald-600"
                 }
               >
-                {formatRupiah(margin.amount.toNumber())}/{displayUnit}
+                {formatRupiah(margin.amount.toNumber() * displayContent)}/{displayUnit}
                 {margin.percent !== null
                   ? ` (${marginPercentFormatter.format(margin.percent.toNumber())}%)`
                   : ""}
@@ -192,12 +232,18 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             ) : (
               <span className="text-slate-500">— (atur harga jual dulu)</span>
             )}
+            {displayContent > 1 && margin ? (
+              <span className="text-slate-500">
+                {" "}
+                ({formatRupiah(margin.amount.toNumber())}/{baseUnitLabel})
+              </span>
+            ) : null}
           </p>
         </Card>
 
         <SellRecommendation
           productId={product.id}
-          baseUnitLabel={displayUnit}
+          baseUnitLabel={baseUnitLabel}
           offers={recommendationOffers}
         />
 
@@ -216,6 +262,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             stockQty: product.stockQty.toString(),
             lowStockThreshold: product.lowStockThreshold?.toString() ?? null,
             sellPricePerBaseUnit: product.sellPricePerBaseUnit?.toString() ?? null,
+            eceranPricePerBaseUnit: product.eceranPricePerBaseUnit?.toString() ?? null,
           }}
           categories={categories.map((category) => ({ id: category.id, name: category.name }))}
         />

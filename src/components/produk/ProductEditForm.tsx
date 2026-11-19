@@ -25,6 +25,7 @@ interface ProductFieldErrors {
   stockQty?: string[];
   lowStockThreshold?: string[];
   sellPricePerBaseUnit?: string[];
+  eceranPricePerBaseUnit?: string[];
 }
 
 /**
@@ -49,6 +50,8 @@ export interface ProductEditFormData {
   lowStockThreshold: string | null;
   /** Harga jual per satuan dasar, null bila belum diatur. */
   sellPricePerBaseUnit: string | null;
+  /** Harga jual eceran per satuan dasar (pcs), null bila tidak ada. */
+  eceranPricePerBaseUnit: string | null;
 }
 
 export function ProductEditForm({
@@ -70,6 +73,7 @@ export function ProductEditForm({
   const [stockQty, setStockQty] = useState(product.stockQty);
   const [lowStockThreshold, setLowStockThreshold] = useState(product.lowStockThreshold ?? "");
   const [sellPrice, setSellPrice] = useState(product.sellPricePerBaseUnit ?? "");
+  const [eceranPrice, setEceranPrice] = useState(product.eceranPricePerBaseUnit ?? "");
   const [fieldErrors, setFieldErrors] = useState<ProductFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -96,6 +100,7 @@ export function ProductEditForm({
         stockQty: Number(stockQty),
         lowStockThreshold: lowStockThreshold.trim() === "" ? null : Number(lowStockThreshold),
         sellPricePerBaseUnit: sellPrice.trim() === "" ? null : Number(sellPrice),
+        eceranPricePerBaseUnit: eceranPrice.trim() === "" ? null : Number(eceranPrice),
         // TIDAK ditampilkan di form sederhana ini, tetapi dikirim apa
         // adanya (nilai lama) agar tidak tertimpa kosong saat menyimpan
         // (PATCH membutuhkan seluruh field, bukan partial).
@@ -243,6 +248,31 @@ export function ProductEditForm({
           </p>
         )}
       </div>
+
+      {unitFamily === "COUNT" ? (
+        <div>
+          <Label htmlFor="eceranPricePerBaseUnit">
+            Harga jual eceran (per {BASE_UNIT_LABELS[BASE_UNIT_BY_FAMILY[unitFamily]]})
+          </Label>
+          <Input
+            id="eceranPricePerBaseUnit"
+            type="number"
+            min="0"
+            step="any"
+            placeholder="Opsional"
+            value={eceranPrice}
+            onChange={(event) => setEceranPrice(event.target.value)}
+          />
+          {fieldErrors.eceranPricePerBaseUnit ? (
+            <p className="mt-1 text-xs text-red-600">{fieldErrors.eceranPricePerBaseUnit[0]}</p>
+          ) : (
+            <p className="mt-1 text-xs text-slate-400">
+              Harga jual per pcs bila barang renceng dijual eceran (mis. Rp2.000/pcs untuk Kopi Good
+              Day). Kosongkan bila produk tidak dijual eceran.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       <div>
         <Label htmlFor="unitFamily">Jenis Satuan Pembanding</Label>

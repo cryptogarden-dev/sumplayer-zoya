@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ProductBrowser } from "@/components/produk/ProductBrowser";
 import { computeCheapestBuyPricePerBaseUnit, computeMargin } from "@/lib/domain/pricing/margin";
 import { displayUnitLabel } from "@/lib/format/units";
+import { displayPackageContent } from "@/lib/domain/stock/package-qty";
 
 export const metadata: Metadata = { title: "Produk" };
 export const dynamic = "force-dynamic";
@@ -90,6 +91,15 @@ export default async function ProdukPage() {
               lowStockThreshold: product.lowStockThreshold?.toString() ?? null,
               baseUnit: product.baseUnit,
               displayUnit: displayUnitLabel(product.baseUnit, product.supplierProducts),
+              displayPackageContent: displayPackageContent(
+                product.supplierProducts.map((offer) => ({
+                  packageType: offer.packageType,
+                  totalPackageContent: Number(offer.totalPackageContent),
+                  pricePerPackage: offer.prices[0]
+                    ? Number(offer.prices[0].pricePerPackage)
+                    : undefined,
+                })),
+              ),
               sellPricePerBaseUnit: product.sellPricePerBaseUnit?.toString() ?? null,
               cheapestBuyPerBaseUnit: cheapestBuy?.pricePerBaseUnit.toNumber() ?? null,
               marginPercent: margin?.percent?.toNumber() ?? null,

@@ -6,11 +6,20 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
 import { formatRupiah } from "@/lib/format/currency";
-import { displayUnitLabel, MEASUREMENT_UNIT_LABELS } from "@/lib/format/units";
+import {
+  BASE_UNIT_LABELS,
+  displayUnitLabel,
+  MEASUREMENT_UNIT_LABELS,
+  PACKAGING_TYPE_LABELS,
+} from "@/lib/format/units";
 import { computeCheapestBuyPricePerBaseUnit, computeMargin } from "@/lib/domain/pricing/margin";
 import { calculateSubtotal } from "@/lib/domain/pricing/subtotal";
 import { calculatePricePerBaseUnit } from "@/lib/domain/pricing/unit-price";
+import { displayPackageContent, toDisplayQty } from "@/lib/domain/stock/package-qty";
 import { EditableSellPrice } from "@/components/stok/EditableSellPrice";
+import { EditableEceranPrice } from "@/components/stok/EditableEceranPrice";
+import { StockAdjuster } from "@/components/stok/StockAdjuster";
+import { SellButton } from "@/components/stok/SellButton";
 
 export const metadata: Metadata = { title: "Stok Toko" };
 export const dynamic = "force-dynamic";
@@ -18,34 +27,20 @@ export const dynamic = "force-dynamic";
 const numberFormatter = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
 const marginPercentFormatter = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
 
-type StockStatus = "habis" | "menipis" | "aman";
+type StockStatus = "habis" | "ada";
 type StockFilter = "ada" | "semua" | StockStatus;
 
 const FILTERS: { key: StockFilter; label: string }[] = [
   { key: "ada", label: "Ada Stok" },
   { key: "habis", label: "Habis" },
-  { key: "menipis", label: "Menipis" },
-  { key: "aman", label: "Aman" },
   { key: "semua", label: "Semua" },
 ];
 
-/**
- * Status stok mengikuti aturan ambang yang sama dengan kartu Beranda:
- * habis bila stok 0; menipis bila ada ambang dan stok sudah mencapai /
- * melewatinya; selain itu aman.
- */
-function stockStatus(stockQty: number, threshold: number | null): StockStatus {
-  if (stockQty <= 0) return "habis";
-  if (threshold !== null && stockQty <= threshold) return "menipis";
-  return "aman";
+function stockStatus(stockQty: number): StockStatus {
+  return stockQty <= 0 ? "habis" : "ada";
 }
 
-const STATUS_ORDER: Record<StockStatus, number> = { habis: 0, menipis: 1, aman: 2 };
-
-const STATUS_PILL_CLASSES: Record<Exclude<StockStatus, "aman">, string> = {
-  habis: "bg-red-100 text-red-700",
-  menipis: "bg-amber-100 text-amber-700",
-};
+const STATUS_ORDER: Record<StockStatus, number> = { habis: 0, ada: 1 };
 
 export default async function StokTokoPage({
   searchParams,
@@ -66,8 +61,7 @@ export default async function StokTokoPage({
   const rows = products
     .map((product) => {
       const stockQty = Number(product.stockQty);
-      const threshold =
-        product.lowStockThreshold === null ? null : Number(product.lowStockThreshold);
+      const baseUnitLabel = BASE_UNIT_LABELS[product.baseUnit];
       // Harga beli = penawaran aktif termurah per satuan dasar (setelah
       // pajak), pola yang sama dengan halaman Produk.
       const cheapestBuy = computeCheapestBuyPricePerBaseUnit(
@@ -135,25 +129,57 @@ export default async function StokTokoPage({
         product.sellPricePerBaseUnit === null
           ? null
           : stockQty * Number(product.sellPricePerBaseUnit);
+      // Satuan tampil renceng: isi satu renceng dalam satuan dasar
+      // (10 untuk Kopi Good Day: 1 renceng = 10 pcs), 1 bila produk
+      // tidak dijual per renceng. Harga per satuan tampil = harga per
+      // satuan dasar x isi ini.
+      const displayContent = displayPackageContent(
+        product.supplierProducts.map((offer) => ({
+          packageType: offer.packageType,
+          totalPackageContent: Number(offer.totalPackageContent),
+          pricePerPackage: offer.prices[0] ? Number(offer.prices[0].pricePerPackage) : undefined,
+        })),
+      );
+      const displayUnit = displayUnitLabel(product.baseUnit, product.supplierProducts);
+      // Baris kecil di bawah stok: satuan yang satunya lagi — "30 pcs"
+      // untuk produk renceng, "2 Karung" / "20 Pak" untuk produk yang
+      // kemasan termurahnya berisi lebih dari 1 satuan dasar.
+      const stockSubline =
+        displayContent > 1
+          ? `${numberFormatter.format(stockQty)} ${baseUnitLabel}`
+          : packageContent !== null && packageContent > 1 && cheapestOffer !== null
+            ? `${numberFormatter.format(stockQty / packageContent)} ${PACKAGING_TYPE_LABELS[cheapestOffer.packageType]}`
+            : null;
       return {
         id: product.id,
         productName: product.productName,
         categoryName: product.category?.name ?? null,
         stockQty,
-        threshold,
+        unitFamily: product.unitFamily,
         baseUnit: product.baseUnit,
-        displayUnit: displayUnitLabel(product.baseUnit, product.supplierProducts),
+        baseUnitLabel,
+        displayUnit,
+        displayContent,
+        displayQty: toDisplayQty(stockQty, displayContent),
+        stockSubline,
         sellPricePerBaseUnit: product.sellPricePerBaseUnit,
+        eceranPricePerBaseUnit:
+          product.eceranPricePerBaseUnit === null ? null : Number(product.eceranPricePerBaseUnit),
         cheapestBuyPerBaseUnit: cheapestBuy?.pricePerBaseUnit.toNumber() ?? null,
+        buyPerDisplayUnit:
+          cheapestBuy === null ? null : cheapestBuy.pricePerBaseUnit.toNumber() * displayContent,
         sellPerPackage,
         buyPerPackage,
         packageLabel,
+        packageContent,
+        cheapestPackageTypeLabel:
+          cheapestOffer === null ? null : PACKAGING_TYPE_LABELS[cheapestOffer.packageType],
         marginAmount: margin === null ? null : margin.amount.toNumber(),
         marginPercent: margin?.percent?.toNumber() ?? null,
         marginPerPackage,
         stockValue,
         stockSellValue,
-        status: stockStatus(stockQty, threshold),
+        status: stockStatus(stockQty),
       };
     })
     .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
@@ -162,8 +188,6 @@ export default async function StokTokoPage({
     ada: rows.filter((row) => row.status !== "habis").length,
     semua: rows.length,
     habis: rows.filter((row) => row.status === "habis").length,
-    menipis: rows.filter((row) => row.status === "menipis").length,
-    aman: rows.filter((row) => row.status === "aman").length,
   };
 
   // Total nilai stok — dihitung dari stok yang ADA sekarang, jadi otomatis
@@ -191,14 +215,8 @@ export default async function StokTokoPage({
     <div>
       <PageHeader title="Stok Toko" description="Stok toko saat ini per produk." />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <StatCard label="Total Produk" value={counts.semua} description="Produk aktif" />
-        <StatCard
-          label="Stok Menipis"
-          value={counts.menipis}
-          description="Mencapai ambang stok menipis"
-        />
-        <StatCard label="Stok Habis" value={counts.habis} description="Stok 0, perlu dipesan" />
         <StatCard
           label="Total Harga Beli (Rp)"
           value={totals.buy}
@@ -235,16 +253,16 @@ export default async function StokTokoPage({
         />
       ) : (
         <div className="border-divider overflow-x-auto rounded-[20px] border bg-white">
-          <table className="w-full min-w-[980px] text-left text-sm">
+          <table className="w-full min-w-[1120px] text-left text-sm">
             <thead>
               <tr className="border-divider border-b text-xs text-slate-500">
                 <th className="px-4 py-3 font-medium">Produk</th>
                 <th className="px-4 py-3 font-medium">Stok</th>
-                <th className="px-4 py-3 font-medium">Ambang</th>
                 <th className="px-4 py-3 font-medium">Harga Beli</th>
                 <th className="px-4 py-3 font-medium">Harga Jual</th>
                 <th className="px-4 py-3 font-medium">Keuntungan</th>
                 <th className="px-4 py-3 font-medium">Nilai Stok</th>
+                <th className="px-4 py-3 font-medium">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -262,27 +280,31 @@ export default async function StokTokoPage({
                     ) : null}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="font-semibold text-slate-900">
-                      {numberFormatter.format(row.stockQty)} {row.displayUnit}
-                    </span>
-                    {row.status !== "aman" ? (
-                      <span
-                        className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_PILL_CLASSES[row.status]}`}
-                      >
-                        {row.status === "habis" ? "Habis" : "Menipis"}
+                    <StockAdjuster
+                      productId={row.id}
+                      stockQtyBase={row.stockQty}
+                      displayUnit={row.displayUnit}
+                      packageContent={row.displayContent}
+                      stockSubline={row.stockSubline}
+                    />
+                    {row.status === "habis" ? (
+                      <span className="mt-1 inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                        Habis
                       </span>
                     ) : null}
                   </td>
                   <td className="px-4 py-3 text-slate-600">
-                    {row.threshold === null
+                    {row.buyPerDisplayUnit === null
                       ? "—"
-                      : `${numberFormatter.format(row.threshold)} ${row.displayUnit}`}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">
-                    {row.cheapestBuyPerBaseUnit === null
-                      ? "—"
-                      : `${formatRupiah(row.cheapestBuyPerBaseUnit)}/${row.displayUnit}`}
-                    {row.buyPerPackage !== null && row.packageLabel !== null ? (
+                      : `${formatRupiah(row.buyPerDisplayUnit)}/${row.displayUnit}`}
+                    {row.displayContent > 1 && row.cheapestBuyPerBaseUnit !== null ? (
+                      <p className="mt-1 text-xs text-slate-500">
+                        {formatRupiah(row.cheapestBuyPerBaseUnit)}/{row.baseUnitLabel}
+                      </p>
+                    ) : null}
+                    {row.displayContent === 1 &&
+                    row.buyPerPackage !== null &&
+                    row.packageLabel !== null ? (
                       <p className="mt-1 text-xs text-slate-500">
                         {formatRupiah(row.buyPerPackage)} / {row.packageLabel}
                       </p>
@@ -295,11 +317,28 @@ export default async function StokTokoPage({
                         row.sellPricePerBaseUnit === null ? null : Number(row.sellPricePerBaseUnit)
                       }
                       unitLabel={row.displayUnit}
+                      packageContent={row.displayContent}
                     />
-                    {row.sellPerPackage !== null && row.packageLabel !== null ? (
+                    {row.displayContent > 1 && row.sellPricePerBaseUnit !== null ? (
+                      <p className="mt-1 text-xs text-slate-500">
+                        {formatRupiah(Number(row.sellPricePerBaseUnit))}/{row.baseUnitLabel}
+                      </p>
+                    ) : null}
+                    {row.displayContent === 1 &&
+                    row.sellPerPackage !== null &&
+                    row.packageLabel !== null ? (
                       <p className="mt-1 text-xs text-slate-500">
                         {formatRupiah(row.sellPerPackage)} / {row.packageLabel}
                       </p>
+                    ) : null}
+                    {row.unitFamily === "COUNT" ? (
+                      <div className="mt-1 text-xs">
+                        <EditableEceranPrice
+                          productId={row.id}
+                          initialValue={row.eceranPricePerBaseUnit}
+                          unitLabel={row.baseUnitLabel}
+                        />
+                      </div>
                     ) : null}
                   </td>
                   <td className="px-4 py-3 text-slate-600">
@@ -331,12 +370,34 @@ export default async function StokTokoPage({
                       </span>
                     )}
                   </td>
+                  <td className="px-4 py-3">
+                    <SellButton
+                      product={{
+                        id: row.id,
+                        productName: row.productName,
+                        stockQtyBase: row.stockQty,
+                        displayUnit: row.displayUnit,
+                        displayPackageContent: row.displayContent,
+                        baseUnitLabel: row.baseUnitLabel,
+                        packageLabel:
+                          row.packageContent !== null && row.packageContent > 1
+                            ? row.cheapestPackageTypeLabel
+                            : null,
+                        packageContent: row.packageContent,
+                        sellPerBase:
+                          row.sellPricePerBaseUnit === null
+                            ? null
+                            : Number(row.sellPricePerBaseUnit),
+                        eceranPerBase: row.eceranPricePerBaseUnit,
+                      }}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="border-divider border-t bg-slate-50 font-semibold text-slate-900">
-                <td className="px-4 py-3" colSpan={3}>
+                <td className="px-4 py-3" colSpan={2}>
                   Total ({stockedCount} produk ada stok)
                 </td>
                 <td className="px-4 py-3 text-slate-400">—</td>
@@ -350,6 +411,7 @@ export default async function StokTokoPage({
                   </span>
                 </td>
                 <td className="px-4 py-3">{formatRupiah(totals.buy)}</td>
+                <td className="px-4 py-3" />
               </tr>
             </tfoot>
           </table>

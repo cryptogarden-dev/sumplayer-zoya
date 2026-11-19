@@ -3,6 +3,7 @@ import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { NavIcon } from "@/components/app-shell/NavIcon";
 import { categoryTone } from "@/lib/format/category-color";
 import { formatRupiah } from "@/lib/format/currency";
+import { BASE_UNIT_LABELS } from "@/lib/format/units";
 import type { BaseUnit, UnitFamily } from "@/lib/domain/units/types";
 
 // Kelas Tailwind harus berupa literal statis agar terdeteksi compiler -
@@ -41,6 +42,9 @@ export interface ProductCardData {
   baseUnit: BaseUnit;
   /** Satuan tampil (mis. "Renceng" untuk Susu Bendera — lihat displayUnitLabel). */
   displayUnit: string;
+  /** Isi satu renceng dalam satuan dasar (10 untuk Kopi Good Day: 1
+   * renceng = 10 pcs), 1 bila produk tidak dijual per renceng. */
+  displayPackageContent: number;
   /** Harga jual per satuan dasar (string Decimal), null bila belum diatur. */
   sellPricePerBaseUnit: string | null;
   /** Harga beli termurah per satuan dasar (setelah pajak), null bila belum
@@ -135,7 +139,7 @@ export function ProductCard({
             <p className="text-xs text-slate-400">Modal</p>
             <p className="truncate text-sm font-semibold text-slate-900">
               {product.cheapestBuyPerBaseUnit != null
-                ? `${formatRupiah(product.cheapestBuyPerBaseUnit)}/${product.displayUnit}`
+                ? `${formatRupiah(product.cheapestBuyPerBaseUnit * product.displayPackageContent)}/${product.displayUnit}`
                 : "—"}
             </p>
           </div>
@@ -143,7 +147,8 @@ export function ProductCard({
             <p className="text-xs text-slate-400">Jual</p>
             {product.sellPricePerBaseUnit != null ? (
               <p className="text-kunyit truncate text-sm font-semibold">
-                {formatRupiah(Number(product.sellPricePerBaseUnit))}/{product.displayUnit}
+                {formatRupiah(Number(product.sellPricePerBaseUnit) * product.displayPackageContent)}
+                /{product.displayUnit}
               </p>
             ) : (
               <p className="truncate text-sm text-slate-400">
@@ -166,8 +171,18 @@ export function ProductCard({
           </p>
         ) : null}
         <p className="text-xs text-slate-500">
-          Stok toko: {new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 }).format(stockQty)}{" "}
+          Stok toko:{" "}
+          {new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 }).format(
+            stockQty / product.displayPackageContent,
+          )}{" "}
           {product.displayUnit}
+          {product.displayPackageContent > 1 ? (
+            <span className="text-slate-400">
+              {" "}
+              ({new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 }).format(stockQty)}{" "}
+              {BASE_UNIT_LABELS[product.baseUnit]})
+            </span>
+          ) : null}
           {isLowStock ? (
             <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">
               Stok menipis

@@ -8,6 +8,13 @@ interface EditableSellPriceProps {
   productId: string;
   initialValue: number | null;
   unitLabel: string;
+  /**
+   * Satuan dasar per satuan tampil (mis. 10 untuk Kopi Good Day:
+   * 1 renceng = 10 pcs). Input menampilkan/menyimpan harga per satuan
+   * tampil (Rp13.500/renceng), API tetap menerima harga per satuan
+   * dasar (Rp1.350/pcs). Default 1 (harga tampil = harga per dasar).
+   */
+  packageContent?: number;
 }
 
 /**
@@ -17,7 +24,12 @@ interface EditableSellPriceProps {
  * jual. Enter menyimpan, Esc membatalkan. Harga beli tidak bisa diedit
  * di sini — asalnya dari penawaran supplier termurah.
  */
-export function EditableSellPrice({ productId, initialValue, unitLabel }: EditableSellPriceProps) {
+export function EditableSellPrice({
+  productId,
+  initialValue,
+  unitLabel,
+  packageContent = 1,
+}: EditableSellPriceProps) {
   const router = useRouter();
   const [value, setValue] = useState<number | null>(initialValue);
   const [editing, setEditing] = useState(false);
@@ -25,8 +37,11 @@ export function EditableSellPrice({ productId, initialValue, unitLabel }: Editab
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** Harga tampil (per satuan tampil) dari harga per satuan dasar. */
+  const displayValue = value === null ? null : value * packageContent;
+
   function startEditing() {
-    setDraft(value === null ? "" : String(value));
+    setDraft(displayValue === null ? "" : String(displayValue));
     setError(null);
     setEditing(true);
   }
@@ -68,7 +83,9 @@ export function EditableSellPrice({ productId, initialValue, unitLabel }: Editab
       setError("Harga jual harus angka 0 atau lebih.");
       return;
     }
-    await submit(parsed);
+    // Konversi kembali ke harga per satuan dasar (dibulatkan ke rupiah,
+    // karena kolom harga jual memakai 2 desimal).
+    await submit(Math.round((parsed / packageContent) * 100) / 100);
   }
 
   if (!editing) {
@@ -79,7 +96,7 @@ export function EditableSellPrice({ productId, initialValue, unitLabel }: Editab
         title="Klik untuk ubah harga jual"
         className="group inline-flex items-baseline gap-1 text-slate-600 hover:text-slate-900"
       >
-        <span>{value === null ? "—" : `${formatRupiah(value)}/${unitLabel}`}</span>
+        <span>{displayValue === null ? "—" : `${formatRupiah(displayValue)}/${unitLabel}`}</span>
         <span className="text-xs text-slate-400 opacity-0 transition-opacity group-hover:opacity-100">
           Ubah
         </span>

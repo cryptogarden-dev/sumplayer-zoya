@@ -20,11 +20,11 @@ vi.mock("next/link", () => ({
 
 import { BottomNav } from "@/components/app-shell/BottomNav";
 
-describe("BottomNav (R24 - navigasi bawah di HP, R25 - 5 menu utama)", () => {
+describe("BottomNav (R24 - navigasi bawah di HP, R25 - 6 menu utama)", () => {
   it("menampilkan tepat 5 tautan navigasi", () => {
     render(<BottomNav />);
     const nav = screen.getByRole("navigation", { name: "Navigasi utama" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(5);
+    expect(within(nav).getAllByRole("link")).toHaveLength(6);
   });
 
   it("menandai menu yang sesuai dengan halaman aktif", () => {

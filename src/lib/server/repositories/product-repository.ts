@@ -1,6 +1,10 @@
 import "server-only";
+import { Decimal } from "decimal.js";
 import { prisma } from "@/lib/db/prisma";
+import { ApiError } from "@/lib/server/api-auth";
 import { BASE_UNIT_BY_FAMILY, DeletionBlockedError } from "@/lib/domain";
+import { calculateSubtotal } from "@/lib/domain/pricing/subtotal";
+import { calculatePricePerBaseUnit } from "@/lib/domain/pricing/unit-price";
 import type { ProductInput } from "@/lib/validation/product";
 import type { Prisma } from "@generated/prisma/client";
 
@@ -119,6 +123,7 @@ export async function createProduct(businessId: string, userId: string, input: P
       baseUnit: resolveBaseUnit(input),
       notes: input.notes ?? null,
       sellPricePerBaseUnit: input.sellPricePerBaseUnit ?? null,
+      eceranPricePerBaseUnit: input.eceranPricePerBaseUnit ?? null,
       createdById: userId,
     },
   });
@@ -147,6 +152,10 @@ export async function updateProduct(businessId: string, id: string, input: Produ
       // Harga jual: pola yang sama — hanya diubah bila klien mengirimnya.
       ...(input.sellPricePerBaseUnit !== undefined
         ? { sellPricePerBaseUnit: input.sellPricePerBaseUnit }
+        : {}),
+      // Harga jual eceran: pola yang sama (Stok Fleksibel 2026-11-19).
+      ...(input.eceranPricePerBaseUnit !== undefined
+        ? { eceranPricePerBaseUnit: input.eceranPricePerBaseUnit }
         : {}),
     },
   });
@@ -182,6 +191,281 @@ export async function setSellPrice(
     data: { sellPricePerBaseUnit },
   });
   return result.count > 0;
+}
+
+/**
+ * Setel harga jual eceran per satuan dasar saja (Stok Fleksibel,
+ * 2026-11-19) — dipakai editor eceran di Stok Toko dan form edit produk.
+ * NULL = tidak ada harga eceran; jual per pcs memakai harga jual per
+ * satuan dasar.
+ */
+export async function setEceranPrice(
+  businessId: string,
+  id: string,
+  eceranPricePerBaseUnit: number | null,
+) {
+  const result = await prisma.product.updateMany({
+    where: { id, businessId },
+    data: { eceranPricePerBaseUnit },
+  });
+  return result.count > 0;
+}
+
+export interface StockAdjustmentResult {
+  /** Stok baru dalam satuan dasar. */
+  stockQty: number;
+  /** Selisih stok dalam satuan dasar (baru − lama), bertanda. */
+  deltaBase: number;
+  /** Id baris riwayat yang ditulis, null bila stok tidak berubah. */
+  movementId: string | null;
+}
+
+/**
+ * Setel stok toko ke jumlah baru (satuan dasar) + catat pergerakan
+ * PENYESUAIAN di `stock_movements` — dipakai tombol +/- dan input angka
+ * di Stok Toko. Stok tidak boleh negatif (ditolak 400). Bila jumlah
+ * tidak berubah, tidak ada baris riwayat yang ditulis. Satu transaksi:
+ * stok dan riwayat selalu konsisten.
+ */
+export async function adjustStock(
+  businessId: string,
+  userId: string,
+  productId: string,
+  newStockQtyBase: number,
+  movement: { unitLabel: string; unitQuantity: number; note?: string },
+): Promise<StockAdjustmentResult | null> {
+  return prisma.$transaction(async (tx) => {
+    const product = await tx.product.findFirst({
+      where: { id: productId, businessId },
+      select: { stockQty: true },
+    });
+    if (!product) return null;
+
+    const oldQty = new Decimal(product.stockQty);
+    const nextQty = new Decimal(newStockQtyBase);
+    if (nextQty.isNegative()) {
+      throw new ApiError(400, "Stok tidak boleh negatif.");
+    }
+    const delta = nextQty.minus(oldQty);
+    await tx.product.update({
+      where: { id: productId },
+      data: { stockQty: nextQty },
+    });
+
+    let movementId: string | null = null;
+    if (!delta.isZero()) {
+      const created = await tx.stockMovement.create({
+        data: {
+          businessId,
+          productId,
+          type: "PENYESUAIAN",
+          quantityDeltaBase: delta,
+          unitLabel: movement.unitLabel,
+          unitQuantity: new Decimal(movement.unitQuantity),
+          note: movement.note ?? null,
+          createdById: userId,
+        },
+      });
+      movementId = created.id;
+    }
+
+    return {
+      stockQty: nextQty.toNumber(),
+      deltaBase: delta.toNumber(),
+      movementId,
+    };
+  });
+}
+
+export interface SaleInput {
+  /** "package" = jual per kemasan termurah, "base" = jual per satuan dasar. */
+  unit: "package" | "base";
+  /** Jumlah dalam satuan yang dipilih. */
+  quantity: number;
+  /** Label satuan yang dipilih pengguna (mis. "Renceng" / "pcs"). */
+  unitLabel: string;
+}
+
+export interface SaleResult {
+  /** Stok baru dalam satuan dasar. */
+  stockQty: number;
+  /** Total penjualan (Rp). */
+  totalAmount: number;
+  unitLabel: string;
+  unitQuantity: number;
+  /** Harga per satuan yang dipilih (Rp). */
+  unitPrice: number;
+}
+
+/**
+ * Catat satu penjualan + kurangi stok (Stok Fleksibel, 2026-11-19).
+ * Satu transaksi: stok berkurang dan baris PENJUALAN tercatat — tidak
+ * bisa ada penjualan tanpa pengurangan stok, dan sebaliknya.
+ *
+ * Harga dihitung di server dari harga yang tersimpan (bukan dari klien):
+ * - per kemasan: harga jual per satuan dasar x isi kemasan termurah;
+ * - per satuan dasar: harga eceran bila ada, kalau tidak harga jual
+ *   per satuan dasar.
+ * Stok berkurang dalam satuan dasar (kemasan x isi), jadi renceng dan
+ * pcs memakai satu sistem persediaan yang sama — tidak dihitung dua
+ * kali. Stok tidak boleh kurang dari yang dijual (ditolak 400).
+ */
+export async function recordSale(
+  businessId: string,
+  userId: string,
+  productId: string,
+  input: SaleInput,
+): Promise<SaleResult | null> {
+  return prisma.$transaction(async (tx) => {
+    const product = await tx.product.findFirst({
+      where: { id: productId, businessId },
+      include: {
+        supplierProducts: {
+          where: { isActive: true },
+          select: {
+            packageType: true,
+            totalPackageContent: true,
+            prices: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: {
+                pricePerPackage: true,
+                taxStatus: true,
+                taxRateValueSnapshot: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!product) return null;
+    if (input.quantity <= 0) {
+      throw new ApiError(400, "Jumlah jual harus lebih dari 0.");
+    }
+
+    // Kemasan jual = penawaran termurah per satuan dasar (aturan yang
+    // sama dengan Harga Beli di Stok Toko).
+    const pricedOffers = product.supplierProducts.filter((offer) => offer.prices[0]);
+    let cheapestOffer: (typeof pricedOffers)[number] | null = null;
+    let cheapestPerBaseUnit: ReturnType<typeof calculatePricePerBaseUnit> | null = null;
+    for (const offer of pricedOffers) {
+      const perBaseUnit = calculatePricePerBaseUnit(
+        calculateSubtotal({
+          packagesToBuy: 1,
+          pricePerPackage: offer.prices[0]!.pricePerPackage,
+          taxStatus: offer.prices[0]!.taxStatus,
+          taxRatePercent: offer.prices[0]!.taxRateValueSnapshot ?? 0,
+        }).pricePerPackageAfterTax,
+        offer.totalPackageContent,
+      );
+      if (cheapestPerBaseUnit === null || perBaseUnit.lessThan(cheapestPerBaseUnit)) {
+        cheapestPerBaseUnit = perBaseUnit;
+        cheapestOffer = offer;
+      }
+    }
+    const packageContent = cheapestOffer === null ? 1 : Number(cheapestOffer.totalPackageContent);
+
+    const sellPerBase =
+      product.sellPricePerBaseUnit === null ? null : Number(product.sellPricePerBaseUnit);
+    const eceranPerBase =
+      product.eceranPricePerBaseUnit === null ? null : Number(product.eceranPricePerBaseUnit);
+
+    let baseQty: Decimal;
+    let unitPrice: Decimal;
+    if (input.unit === "package") {
+      if (packageContent <= 1) {
+        throw new ApiError(400, "Produk ini tidak dijual per kemasan.");
+      }
+      if (sellPerBase === null) {
+        throw new ApiError(400, "Harga jual produk ini belum diatur.");
+      }
+      baseQty = new Decimal(input.quantity).times(packageContent).toDecimalPlaces(4);
+      unitPrice = new Decimal(sellPerBase).times(packageContent);
+    } else {
+      const baseUnitPrice =
+        eceranPerBase !== null
+          ? new Decimal(eceranPerBase)
+          : sellPerBase !== null
+            ? new Decimal(sellPerBase)
+            : null;
+      if (baseUnitPrice === null) {
+        throw new ApiError(400, "Harga jual produk ini belum diatur.");
+      }
+      unitPrice = baseUnitPrice;
+      baseQty = new Decimal(input.quantity).toDecimalPlaces(4);
+    }
+
+    const stockQty = new Decimal(product.stockQty);
+    if (baseQty.greaterThan(stockQty)) {
+      throw new ApiError(400, "Stok tidak cukup untuk penjualan ini.");
+    }
+    const totalAmount = new Decimal(input.quantity)
+      .times(unitPrice)
+      .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+    const nextQty = stockQty.minus(baseQty);
+
+    await tx.product.update({
+      where: { id: productId },
+      data: { stockQty: nextQty },
+    });
+    await tx.stockMovement.create({
+      data: {
+        businessId,
+        productId,
+        type: "PENJUALAN",
+        quantityDeltaBase: baseQty.negated(),
+        unitLabel: input.unitLabel,
+        unitQuantity: new Decimal(input.quantity),
+        unitPrice,
+        totalAmount,
+        createdById: userId,
+      },
+    });
+
+    return {
+      stockQty: nextQty.toNumber(),
+      totalAmount: totalAmount.toNumber(),
+      unitLabel: input.unitLabel,
+      unitQuantity: input.quantity,
+      unitPrice: unitPrice.toNumber(),
+    };
+  });
+}
+
+/**
+ * Riwayat pergerakan stok, terbaru dulu — dipakai halaman Penjualan
+ * (hanya PENJUALAN) dan riwayat produk. `take` dibatasi 100.
+ */
+export async function listStockMovements(
+  businessId: string,
+  filters: { type?: "PENJUALAN" | "PENYESUAIAN"; productId?: string; take?: number } = {},
+) {
+  return prisma.stockMovement.findMany({
+    where: {
+      businessId,
+      ...(filters.type ? { type: filters.type } : {}),
+      ...(filters.productId ? { productId: filters.productId } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    take: Math.min(Math.max(filters.take ?? 50, 1), 100),
+    include: {
+      product: { select: { productName: true } },
+      createdBy: { select: { name: true } },
+    },
+  });
+}
+
+/** Ringkasan penjualan: total omzet tercatat + jumlah transaksi. */
+export async function getSalesSummary(businessId: string) {
+  const aggregate = await prisma.stockMovement.aggregate({
+    where: { businessId, type: "PENJUALAN" },
+    _sum: { totalAmount: true },
+    _count: { _all: true },
+  });
+  return {
+    totalAmount: aggregate._sum.totalAmount?.toNumber() ?? 0,
+    count: aggregate._count._all,
+  };
 }
 
 /**
