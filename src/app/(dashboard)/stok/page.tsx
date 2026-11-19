@@ -127,6 +127,14 @@ export default async function StokTokoPage({
       });
       const marginPerPackage =
         sellPerPackage !== null && buyPerPackage !== null ? sellPerPackage - buyPerPackage : null;
+      // Nilai stok = stok × harga beli termurah (modal yang tertanam di
+      // barang yang ada). Null bila belum ada harga beli / harga jual.
+      const stockValue =
+        cheapestBuy === null ? null : stockQty * cheapestBuy.pricePerBaseUnit.toNumber();
+      const stockSellValue =
+        product.sellPricePerBaseUnit === null
+          ? null
+          : stockQty * Number(product.sellPricePerBaseUnit);
       return {
         id: product.id,
         productName: product.productName,
@@ -143,6 +151,8 @@ export default async function StokTokoPage({
         marginAmount: margin === null ? null : margin.amount.toNumber(),
         marginPercent: margin?.percent?.toNumber() ?? null,
         marginPerPackage,
+        stockValue,
+        stockSellValue,
         status: stockStatus(stockQty, threshold),
       };
     })
@@ -155,6 +165,21 @@ export default async function StokTokoPage({
     menipis: rows.filter((row) => row.status === "menipis").length,
     aman: rows.filter((row) => row.status === "aman").length,
   };
+
+  // Total nilai stok — dihitung dari stok yang ADA sekarang, jadi otomatis
+  // berkurang begitu ada barang yang habis/terjual. Dihitung dari SEMUA
+  // produk (bukan hanya yang tampil di filter), karena produk kosong
+  // nilainya 0 dan tidak mengubah total.
+  const totals = rows.reduce(
+    (acc, row) => ({
+      buy: acc.buy + (row.stockValue ?? 0),
+      sell: acc.sell + (row.stockSellValue ?? 0),
+    }),
+    { buy: 0, sell: 0 },
+  );
+  const totalProfit = totals.sell - totals.buy;
+  const totalProfitPercent = totals.buy > 0 ? (totalProfit / totals.buy) * 100 : null;
+  const stockedCount = rows.filter((row) => row.stockQty > 0).length;
   const visibleRows =
     activeFilter === "semua"
       ? rows
@@ -166,7 +191,7 @@ export default async function StokTokoPage({
     <div>
       <PageHeader title="Stok Toko" description="Stok toko saat ini per produk." />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total Produk" value={counts.semua} description="Produk aktif" />
         <StatCard
           label="Stok Menipis"
@@ -174,6 +199,12 @@ export default async function StokTokoPage({
           description="Mencapai ambang stok menipis"
         />
         <StatCard label="Stok Habis" value={counts.habis} description="Stok 0, perlu dipesan" />
+        <StatCard
+          label="Total Harga Beli (Rp)"
+          value={totals.buy}
+          description="Modal semua stok yang ada"
+          variant="dark"
+        />
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -204,7 +235,7 @@ export default async function StokTokoPage({
         />
       ) : (
         <div className="border-divider overflow-x-auto rounded-[20px] border bg-white">
-          <table className="w-full min-w-[880px] text-left text-sm">
+          <table className="w-full min-w-[980px] text-left text-sm">
             <thead>
               <tr className="border-divider border-b text-xs text-slate-500">
                 <th className="px-4 py-3 font-medium">Produk</th>
@@ -213,6 +244,7 @@ export default async function StokTokoPage({
                 <th className="px-4 py-3 font-medium">Harga Beli</th>
                 <th className="px-4 py-3 font-medium">Harga Jual</th>
                 <th className="px-4 py-3 font-medium">Keuntungan</th>
+                <th className="px-4 py-3 font-medium">Nilai Stok</th>
               </tr>
             </thead>
             <tbody>
@@ -290,9 +322,36 @@ export default async function StokTokoPage({
                       </>
                     )}
                   </td>
+                  <td className="px-4 py-3">
+                    {row.stockValue === null ? (
+                      "—"
+                    ) : (
+                      <span className="font-semibold text-slate-900">
+                        {formatRupiah(row.stockValue)}
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="border-divider border-t bg-slate-50 font-semibold text-slate-900">
+                <td className="px-4 py-3" colSpan={3}>
+                  Total ({stockedCount} produk ada stok)
+                </td>
+                <td className="px-4 py-3 text-slate-400">—</td>
+                <td className="px-4 py-3">{formatRupiah(totals.sell)}</td>
+                <td className="px-4 py-3">
+                  <span className={totalProfit < 0 ? "text-red-600" : "text-emerald-600"}>
+                    {formatRupiah(totalProfit)}
+                    {totalProfitPercent !== null
+                      ? ` (${marginPercentFormatter.format(totalProfitPercent)}%)`
+                      : ""}
+                  </span>
+                </td>
+                <td className="px-4 py-3">{formatRupiah(totals.buy)}</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}
