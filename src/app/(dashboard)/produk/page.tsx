@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ProductBrowser } from "@/components/produk/ProductBrowser";
 import { computeCheapestBuyPricePerBaseUnit, computeMargin } from "@/lib/domain/pricing/margin";
+import { displayUnitLabel } from "@/lib/format/units";
 
 export const metadata: Metadata = { title: "Produk" };
 export const dynamic = "force-dynamic";
@@ -88,6 +89,7 @@ export default async function ProdukPage() {
               stockQty: product.stockQty.toString(),
               lowStockThreshold: product.lowStockThreshold?.toString() ?? null,
               baseUnit: product.baseUnit,
+              displayUnit: displayUnitLabel(product.baseUnit, product.supplierProducts),
               sellPricePerBaseUnit: product.sellPricePerBaseUnit?.toString() ?? null,
               cheapestBuyPerBaseUnit: cheapestBuy?.pricePerBaseUnit.toNumber() ?? null,
               marginPercent: margin?.percent?.toNumber() ?? null,

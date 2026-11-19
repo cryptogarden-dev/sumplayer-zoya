@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
 import { formatRupiah } from "@/lib/format/currency";
-import { BASE_UNIT_LABELS, MEASUREMENT_UNIT_LABELS } from "@/lib/format/units";
+import { displayUnitLabel, MEASUREMENT_UNIT_LABELS } from "@/lib/format/units";
 import { computeCheapestBuyPricePerBaseUnit, computeMargin } from "@/lib/domain/pricing/margin";
 import { calculateSubtotal } from "@/lib/domain/pricing/subtotal";
 import { calculatePricePerBaseUnit } from "@/lib/domain/pricing/unit-price";
@@ -134,6 +134,7 @@ export default async function StokTokoPage({
         stockQty,
         threshold,
         baseUnit: product.baseUnit,
+        displayUnit: displayUnitLabel(product.baseUnit, product.supplierProducts),
         sellPricePerBaseUnit: product.sellPricePerBaseUnit,
         cheapestBuyPerBaseUnit: cheapestBuy?.pricePerBaseUnit.toNumber() ?? null,
         sellPerPackage,
@@ -230,7 +231,7 @@ export default async function StokTokoPage({
                   </td>
                   <td className="px-4 py-3">
                     <span className="font-semibold text-slate-900">
-                      {numberFormatter.format(row.stockQty)} {BASE_UNIT_LABELS[row.baseUnit]}
+                      {numberFormatter.format(row.stockQty)} {row.displayUnit}
                     </span>
                     {row.status !== "aman" ? (
                       <span
@@ -243,12 +244,12 @@ export default async function StokTokoPage({
                   <td className="px-4 py-3 text-slate-600">
                     {row.threshold === null
                       ? "—"
-                      : `${numberFormatter.format(row.threshold)} ${BASE_UNIT_LABELS[row.baseUnit]}`}
+                      : `${numberFormatter.format(row.threshold)} ${row.displayUnit}`}
                   </td>
                   <td className="px-4 py-3 text-slate-600">
                     {row.cheapestBuyPerBaseUnit === null
                       ? "—"
-                      : `${formatRupiah(row.cheapestBuyPerBaseUnit)}/${BASE_UNIT_LABELS[row.baseUnit]}`}
+                      : `${formatRupiah(row.cheapestBuyPerBaseUnit)}/${row.displayUnit}`}
                     {row.buyPerPackage !== null && row.packageLabel !== null ? (
                       <p className="mt-1 text-xs text-slate-500">
                         {formatRupiah(row.buyPerPackage)} / {row.packageLabel}
@@ -261,7 +262,7 @@ export default async function StokTokoPage({
                       initialValue={
                         row.sellPricePerBaseUnit === null ? null : Number(row.sellPricePerBaseUnit)
                       }
-                      unitLabel={BASE_UNIT_LABELS[row.baseUnit]}
+                      unitLabel={row.displayUnit}
                     />
                     {row.sellPerPackage !== null && row.packageLabel !== null ? (
                       <p className="mt-1 text-xs text-slate-500">
@@ -284,7 +285,7 @@ export default async function StokTokoPage({
                         <p className="mt-1 text-xs text-slate-500">
                           {row.marginPerPackage !== null && row.packageLabel !== null
                             ? `${formatRupiah(row.marginPerPackage)} / ${row.packageLabel}`
-                            : `${formatRupiah(row.marginAmount)}/${BASE_UNIT_LABELS[row.baseUnit]}`}
+                            : `${formatRupiah(row.marginAmount)}/${row.displayUnit}`}
                         </p>
                       </>
                     )}

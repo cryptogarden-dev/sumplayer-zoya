@@ -25,7 +25,7 @@ import { OfferForm } from "@/components/produk/OfferForm";
 import { formatRupiah } from "@/lib/format/currency";
 import {
   AVAILABILITY_STATUS_LABELS,
-  BASE_UNIT_LABELS,
+  displayUnitLabel,
   MEASUREMENT_UNIT_LABELS,
   PACKAGING_TYPE_LABELS,
   TAX_STATUS_LABELS,
@@ -87,6 +87,14 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   });
   const marginPercentFormatter = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
 
+  // Satuan tampil: produk hitungan yang dijual per renceng (ada penawaran
+  // aktif berkemas RENCENG) tampil "Renceng", bukan "pcs" — mis. Susu
+  // Bendera. Dipakai di semua angka per satuan di halaman ini.
+  const displayUnit = displayUnitLabel(
+    product.baseUnit,
+    offers.filter((offer) => offer.isActive),
+  );
+
   // Dipakai dua kali di bawah (form ubah per penawaran + form tambah) -
   // dihitung sekali supaya tidak menduplikasi map yang sama.
   const taxRateOptions = taxRates.map((rate) => ({
@@ -110,7 +118,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       return {
         id: offer.id,
         supplierName: offer.supplier.supplierName,
-        packageLabel: `${PACKAGING_TYPE_LABELS[offer.packageType]} · ${Number(offer.itemsPerPackage)} x ${Number(offer.contentPerItem)} ${MEASUREMENT_UNIT_LABELS[offer.contentUnit]} = ${Number(offer.totalPackageContent)} ${BASE_UNIT_LABELS[offer.baseUnit]}`,
+        packageLabel: `${PACKAGING_TYPE_LABELS[offer.packageType]} · ${Number(offer.itemsPerPackage)} x ${Number(offer.contentPerItem)} ${MEASUREMENT_UNIT_LABELS[offer.contentUnit]} = ${Number(offer.totalPackageContent)} ${displayUnit}`,
         pricePerPackageAfterTax: pricePerPackageAfterTax.toString(),
         totalPackageContent: offer.totalPackageContent.toString(),
         pricePerBaseUnit: calculatePricePerBaseUnit(
@@ -132,7 +140,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           <p className="text-sm text-slate-600">
             Stok toko:{" "}
             <span className="font-semibold text-slate-900">
-              {Number(product.stockQty)} {BASE_UNIT_LABELS[product.baseUnit]}
+              {Number(product.stockQty)} {displayUnit}
             </span>
             {product.lowStockThreshold !== null &&
             Number(product.stockQty) <= Number(product.lowStockThreshold) ? (
@@ -143,7 +151,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             {product.lowStockThreshold !== null ? (
               <span className="text-slate-500">
                 {" "}
-                (ambang {Number(product.lowStockThreshold)} {BASE_UNIT_LABELS[product.baseUnit]})
+                (ambang {Number(product.lowStockThreshold)} {displayUnit})
               </span>
             ) : null}
           </p>
@@ -154,7 +162,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             Harga jual:{" "}
             <span className="font-semibold text-slate-900">
               {product.sellPricePerBaseUnit !== null
-                ? `${formatRupiah(Number(product.sellPricePerBaseUnit))}/${BASE_UNIT_LABELS[product.baseUnit]}`
+                ? `${formatRupiah(Number(product.sellPricePerBaseUnit))}/${displayUnit}`
                 : "— (belum diatur)"}
             </span>
           </p>
@@ -162,7 +170,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             Harga beli termurah:{" "}
             <span className="font-semibold text-slate-900">
               {cheapestBuy
-                ? `${formatRupiah(Number(cheapestBuy.pricePerBaseUnit))}/${BASE_UNIT_LABELS[product.baseUnit]} (${cheapestBuy.supplierName})`
+                ? `${formatRupiah(Number(cheapestBuy.pricePerBaseUnit))}/${displayUnit} (${cheapestBuy.supplierName})`
                 : "— (belum ada penawaran)"}
             </span>
           </p>
@@ -176,7 +184,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                     : "font-semibold text-emerald-600"
                 }
               >
-                {formatRupiah(margin.amount.toNumber())}/{BASE_UNIT_LABELS[product.baseUnit]}
+                {formatRupiah(margin.amount.toNumber())}/{displayUnit}
                 {margin.percent !== null
                   ? ` (${marginPercentFormatter.format(margin.percent.toNumber())}%)`
                   : ""}
@@ -189,7 +197,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
         <SellRecommendation
           productId={product.id}
-          baseUnitLabel={BASE_UNIT_LABELS[product.baseUnit]}
+          baseUnitLabel={displayUnit}
           offers={recommendationOffers}
         />
 
@@ -245,7 +253,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                           {PACKAGING_TYPE_LABELS[offer.packageType]} ·{" "}
                           {Number(offer.itemsPerPackage)} x {Number(offer.contentPerItem)}{" "}
                           {MEASUREMENT_UNIT_LABELS[offer.contentUnit]} ={" "}
-                          {Number(offer.totalPackageContent)} {BASE_UNIT_LABELS[offer.baseUnit]}
+                          {Number(offer.totalPackageContent)} {displayUnit}
                         </p>
                         {price ? (
                           <p className="mt-1 text-sm text-slate-600">

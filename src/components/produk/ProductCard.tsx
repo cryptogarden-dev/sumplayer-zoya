@@ -3,7 +3,6 @@ import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { NavIcon } from "@/components/app-shell/NavIcon";
 import { categoryTone } from "@/lib/format/category-color";
 import { formatRupiah } from "@/lib/format/currency";
-import { BASE_UNIT_LABELS } from "@/lib/format/units";
 import type { BaseUnit, UnitFamily } from "@/lib/domain/units/types";
 
 // Kelas Tailwind harus berupa literal statis agar terdeteksi compiler -
@@ -40,6 +39,8 @@ export interface ProductCardData {
   /** Ambang peringatan stok menipis, null bila tidak diatur. */
   lowStockThreshold: string | null;
   baseUnit: BaseUnit;
+  /** Satuan tampil (mis. "Renceng" untuk Susu Bendera — lihat displayUnitLabel). */
+  displayUnit: string;
   /** Harga jual per satuan dasar (string Decimal), null bila belum diatur. */
   sellPricePerBaseUnit: string | null;
   /** Harga beli termurah per satuan dasar (setelah pajak), null bila belum
@@ -134,7 +135,7 @@ export function ProductCard({
             <p className="text-xs text-slate-400">Modal</p>
             <p className="truncate text-sm font-semibold text-slate-900">
               {product.cheapestBuyPerBaseUnit != null
-                ? `${formatRupiah(product.cheapestBuyPerBaseUnit)}/${BASE_UNIT_LABELS[product.baseUnit]}`
+                ? `${formatRupiah(product.cheapestBuyPerBaseUnit)}/${product.displayUnit}`
                 : "—"}
             </p>
           </div>
@@ -142,8 +143,7 @@ export function ProductCard({
             <p className="text-xs text-slate-400">Jual</p>
             {product.sellPricePerBaseUnit != null ? (
               <p className="text-kunyit truncate text-sm font-semibold">
-                {formatRupiah(Number(product.sellPricePerBaseUnit))}/
-                {BASE_UNIT_LABELS[product.baseUnit]}
+                {formatRupiah(Number(product.sellPricePerBaseUnit))}/{product.displayUnit}
               </p>
             ) : (
               <p className="truncate text-sm text-slate-400">
@@ -167,7 +167,7 @@ export function ProductCard({
         ) : null}
         <p className="text-xs text-slate-500">
           Stok toko: {new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 }).format(stockQty)}{" "}
-          {BASE_UNIT_LABELS[product.baseUnit]}
+          {product.displayUnit}
           {isLowStock ? (
             <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">
               Stok menipis

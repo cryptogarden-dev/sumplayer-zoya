@@ -5,7 +5,7 @@ import { listProducts } from "@/lib/server/repositories/product-repository";
 import { LogoZoya } from "@/components/app-shell/LogoZoya";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatRupiah } from "@/lib/format/currency";
-import { BASE_UNIT_LABELS } from "@/lib/format/units";
+import { BASE_UNIT_LABELS, displayUnitLabel } from "@/lib/format/units";
 
 export const metadata: Metadata = {
   title: "Katalog Harga | TOKO ZOYA",
@@ -55,6 +55,7 @@ export default async function KatalogHargaPage() {
       categoryName: product.category?.name ?? "Lainnya",
       photoUrl: product.photoUrl,
       baseUnit: product.baseUnit,
+      displayUnit: displayUnitLabel(product.baseUnit, product.supplierProducts),
       sellPricePerBaseUnit: Number(product.sellPricePerBaseUnit),
       available: Number(product.stockQty) > 0,
     }));
@@ -149,7 +150,7 @@ export default async function KatalogHargaPage() {
                     <span className="text-right font-semibold whitespace-nowrap text-slate-900">
                       {formatRupiah(product.sellPricePerBaseUnit)}
                       <span className="text-muted block text-xs font-normal">
-                        /{BASE_UNIT_LABELS[product.baseUnit]}
+                        /{product.displayUnit}
                       </span>
                     </span>
                   </div>

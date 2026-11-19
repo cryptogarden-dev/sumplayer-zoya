@@ -49,10 +49,13 @@ export async function listProducts(businessId: string, filters: ProductListFilte
           // termurah PER SATUAN DASAR di kartu produk (perbaikan #5).
           totalPackageContent: true,
           // Rincian kemasan dipakai halaman Stok Toko untuk harga jual
-          // per kemasan (mis. bungkus 250 gram) dari penawaran termurah.
+          // per kemasan (mis. bungkus 250 gram) dari penawaran termurah,
+          // dan jenis kemasan dipakai untuk satuan tampil (mis. Renceng
+          // untuk Susu Bendera — lihat displayUnitLabel).
           itemsPerPackage: true,
           contentPerItem: true,
           contentUnit: true,
+          packageType: true,
           prices: {
             orderBy: { createdAt: "desc" },
             take: 1,

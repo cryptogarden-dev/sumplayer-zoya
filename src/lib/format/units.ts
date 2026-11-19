@@ -26,6 +26,25 @@ export const BASE_UNIT_LABELS: Record<BaseUnit, string> = {
   PCS: "pcs",
 };
 
+/**
+ * Satuan tampil untuk satu produk. Produk hitungan yang dijual per
+ * renceng — ada penawaran aktif berkemas RENCENG — tampil "Renceng",
+ * bukan "pcs" (mis. Susu Bendera: stok 2 renceng, Rp8.500/renceng;
+ * Mentega Forvita yang berkemas Pak tetap "pcs"). Selain itu sama
+ * dengan BASE_UNIT_LABELS. Aturannya per produk, bukan per penawaran:
+ * bila suatu saat ada penawaran Renceng dan Pak sekaligus, tampil
+ * Renceng — putuskan manual bila itu terjadi.
+ */
+export function displayUnitLabel(
+  baseUnit: BaseUnit,
+  offers: readonly { packageType: PackagingType }[],
+): string {
+  if (baseUnit === "PCS" && offers.some((offer) => offer.packageType === "RENCENG")) {
+    return "Renceng";
+  }
+  return BASE_UNIT_LABELS[baseUnit];
+}
+
 export const UNIT_FAMILY_LABELS: Record<UnitFamily, string> = {
   WEIGHT: "Berat (kg)",
   VOLUME: "Volume (liter)",
