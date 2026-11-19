@@ -38,6 +38,25 @@ export interface TaxRateOption {
   ratePercent: string;
 }
 
+/** Nilai awal untuk mode ubah penawaran (tombol "Ubah" di kartu penawaran). */
+export interface OfferEditInitial {
+  id: string;
+  supplierName: string;
+  isActive: boolean;
+  packageType: PackagingType;
+  itemsPerPackage: string;
+  contentPerItem: string;
+  contentUnit: MeasurementUnit;
+  minPurchasePackages: string;
+  purchaseMultiplePackages: string;
+  supplierSkuOrName: string;
+  pricePerPackage: string;
+  taxStatus: TaxStatus;
+  taxRateId: string;
+  estimatedDeliveryDaysMin: string;
+  estimatedDeliveryDaysMax: string;
+}
+
 interface OfferFieldErrors {
   supplierId?: string[];
   supplierSkuOrName?: string[];
@@ -112,29 +131,45 @@ export function OfferForm({
   unitFamily,
   suppliers,
   taxRates,
+  initialOffer,
+  onSaved,
+  onCancel,
 }: {
   productId: string;
   unitFamily: UnitFamily;
   suppliers: SupplierOption[];
   taxRates: TaxRateOption[];
+  /** Bila diisi, form berjalan dalam mode ubah (PATCH definisi + harga bila berubah). */
+  initialOffer?: OfferEditInitial | null;
+  onSaved?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const allowedUnits = unitsForFamily(unitFamily);
+  const isEdit = initialOffer != null;
 
   const [supplierId, setSupplierId] = useState("");
-  const [supplierSkuOrName, setSupplierSkuOrName] = useState("");
-  const [packageType, setPackageType] = useState<PackagingType>(PACKAGING_TYPES[0]);
-  const [isLayered, setIsLayered] = useState(false);
-  const [itemsPerPackage, setItemsPerPackage] = useState("1");
-  const [contentPerItem, setContentPerItem] = useState("1");
-  const [contentUnit, setContentUnit] = useState<MeasurementUnit>(
-    allowedUnits[0] ?? MEASUREMENT_UNITS[0],
+  const [supplierSkuOrName, setSupplierSkuOrName] = useState(initialOffer?.supplierSkuOrName ?? "");
+  const [packageType, setPackageType] = useState<PackagingType>(
+    initialOffer?.packageType ?? PACKAGING_TYPES[0],
   );
-  const [minPurchasePackages, setMinPurchasePackages] = useState("1");
-  const [purchaseMultiplePackages, setPurchaseMultiplePackages] = useState("1");
-  const [pricePerPackage, setPricePerPackage] = useState("");
-  const [taxStatus, setTaxStatus] = useState<TaxStatus>("NONE");
-  const [taxRateId, setTaxRateId] = useState(taxRates[0]?.id ?? "");
+  const [isLayered, setIsLayered] = useState(
+    initialOffer ? Number(initialOffer.itemsPerPackage) > 1 : false,
+  );
+  const [itemsPerPackage, setItemsPerPackage] = useState(initialOffer?.itemsPerPackage ?? "1");
+  const [contentPerItem, setContentPerItem] = useState(initialOffer?.contentPerItem ?? "1");
+  const [contentUnit, setContentUnit] = useState<MeasurementUnit>(
+    initialOffer?.contentUnit ?? allowedUnits[0] ?? MEASUREMENT_UNITS[0],
+  );
+  const [minPurchasePackages, setMinPurchasePackages] = useState(
+    initialOffer?.minPurchasePackages ?? "1",
+  );
+  const [purchaseMultiplePackages, setPurchaseMultiplePackages] = useState(
+    initialOffer?.purchaseMultiplePackages ?? "1",
+  );
+  const [pricePerPackage, setPricePerPackage] = useState(initialOffer?.pricePerPackage ?? "");
+  const [taxStatus, setTaxStatus] = useState<TaxStatus>(initialOffer?.taxStatus ?? "NONE");
+  const [taxRateId, setTaxRateId] = useState((initialOffer?.taxRateId || taxRates[0]?.id) ?? "");
   const [availabilityStatus, setAvailabilityStatus] = useState<AvailabilityStatus>("TERSEDIA");
   const [stockQty, setStockQty] = useState("");
   const [fieldErrors, setFieldErrors] = useState<OfferFieldErrors>({});
@@ -188,6 +223,85 @@ export function OfferForm({
     setFieldErrors({});
     setIsSubmitting(true);
 
+    // Mode ubah: PATCH definisi kemasan dulu, lalu harga HANYA bila berubah
+    // (riwayat harga hanya tercatat kalau memang ada perubahan harga/pajak).
+    if (isEdit && initialOffer) {
+      const definitionResponse = await fetch(`/api/supplier-products/${initialOffer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          packageType,
+          itemsPerPackage: Number(effectiveItemsPerPackage),
+          contentPerItem: Number(effectiveContentPerItem),
+          contentUnit: effectiveContentUnit,
+          minPurchasePackages: Number(minPurchasePackages),
+          purchaseMultiplePackages: Number(purchaseMultiplePackages),
+          supplierSkuOrName: supplierSkuOrName || undefined,
+          // Form tidak mengedit estimasi kirim - kirim balik nilai lama
+          // supaya tidak terhapus (server menulis null bila tidak dikirim).
+          estimatedDeliveryDaysMin:
+            initialOffer.estimatedDeliveryDaysMin === ""
+              ? undefined
+              : Number(initialOffer.estimatedDeliveryDaysMin),
+          estimatedDeliveryDaysMax:
+            initialOffer.estimatedDeliveryDaysMax === ""
+              ? undefined
+              : Number(initialOffer.estimatedDeliveryDaysMax),
+        }),
+      });
+
+      const definitionPayload = (await definitionResponse.json().catch(() => null)) as {
+        error?: string;
+        issues?: OfferFieldErrors;
+      } | null;
+
+      if (!definitionResponse.ok) {
+        setIsSubmitting(false);
+        setFormError(
+          definitionPayload?.error ?? "Gagal menyimpan penawaran. Periksa kembali data yang diisi.",
+        );
+        setFieldErrors(definitionPayload?.issues ?? {});
+        return;
+      }
+
+      const priceChanged =
+        Number(pricePerPackage) !== Number(initialOffer.pricePerPackage) ||
+        taxStatus !== initialOffer.taxStatus ||
+        (taxStatus === "NONE" ? "" : taxRateId) !==
+          (initialOffer.taxStatus === "NONE" ? "" : initialOffer.taxRateId);
+
+      if (priceChanged) {
+        const priceResponse = await fetch(`/api/supplier-products/${initialOffer.id}/price`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pricePerPackage: Number(pricePerPackage),
+            taxStatus,
+            taxRateId: taxStatus === "NONE" ? undefined : taxRateId || undefined,
+          }),
+        });
+
+        const pricePayload = (await priceResponse.json().catch(() => null)) as {
+          error?: string;
+          issues?: OfferFieldErrors;
+        } | null;
+
+        if (!priceResponse.ok) {
+          setIsSubmitting(false);
+          setFormError(pricePayload?.error ?? "Definisi tersimpan, tapi harga gagal disimpan.");
+          setFieldErrors(pricePayload?.issues ?? {});
+          router.refresh();
+          return;
+        }
+      }
+
+      setIsSubmitting(false);
+      setSuccessMessage("Penawaran diperbarui.");
+      router.refresh();
+      onSaved?.();
+      return;
+    }
+
     const response = await fetch("/api/supplier-products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -234,25 +348,32 @@ export function OfferForm({
 
   return (
     <form onSubmit={handleSubmit} noValidate className="max-w-lg space-y-4">
-      <div>
-        <Label htmlFor="offer-supplier">Supplier</Label>
-        <Select
-          id="offer-supplier"
-          required
-          value={supplierId}
-          onChange={(event) => setSupplierId(event.target.value)}
-        >
-          <option value="">Pilih supplier...</option>
-          {suppliers.map((supplier) => (
-            <option key={supplier.id} value={supplier.id}>
-              {supplier.supplierName}
-            </option>
-          ))}
-        </Select>
-        {fieldErrors.supplierId ? (
-          <p className="mt-1 text-xs text-red-600">{fieldErrors.supplierId[0]}</p>
-        ) : null}
-      </div>
+      {isEdit && initialOffer ? (
+        <p className="text-sm text-slate-700">
+          Supplier: <strong>{initialOffer.supplierName}</strong>{" "}
+          <span className="text-slate-500">(supplier penawaran tidak bisa diubah)</span>
+        </p>
+      ) : (
+        <div>
+          <Label htmlFor="offer-supplier">Supplier</Label>
+          <Select
+            id="offer-supplier"
+            required
+            value={supplierId}
+            onChange={(event) => setSupplierId(event.target.value)}
+          >
+            <option value="">Pilih supplier...</option>
+            {suppliers.map((supplier) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.supplierName}
+              </option>
+            ))}
+          </Select>
+          {fieldErrors.supplierId ? (
+            <p className="mt-1 text-xs text-red-600">{fieldErrors.supplierId[0]}</p>
+          ) : null}
+        </div>
+      )}
 
       <div>
         <Label htmlFor="offer-package-type">Jenis Kemasan</Label>
@@ -404,36 +525,44 @@ export function OfferForm({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="offer-availability">Status Stok</Label>
-          <Select
-            id="offer-availability"
-            required
-            value={availabilityStatus}
-            onChange={(event) => setAvailabilityStatus(event.target.value as AvailabilityStatus)}
-          >
-            {AVAILABILITY_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {AVAILABILITY_STATUS_LABELS[status]}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="offer-stock-qty">Jumlah Stok</Label>
-          <Input
-            id="offer-stock-qty"
-            type="number"
-            min="0"
-            step="any"
-            placeholder="Opsional"
-            value={stockQty}
-            onChange={(event) => setStockQty(event.target.value)}
-          />
-        </div>
-      </div>
-      {fieldErrors.stock ? <p className="text-xs text-red-600">{fieldErrors.stock[0]}</p> : null}
+      {isEdit ? null : (
+        <>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="offer-availability">Status Stok</Label>
+              <Select
+                id="offer-availability"
+                required
+                value={availabilityStatus}
+                onChange={(event) =>
+                  setAvailabilityStatus(event.target.value as AvailabilityStatus)
+                }
+              >
+                {AVAILABILITY_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {AVAILABILITY_STATUS_LABELS[status]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="offer-stock-qty">Jumlah Stok</Label>
+              <Input
+                id="offer-stock-qty"
+                type="number"
+                min="0"
+                step="any"
+                placeholder="Opsional"
+                value={stockQty}
+                onChange={(event) => setStockQty(event.target.value)}
+              />
+            </div>
+          </div>
+          {fieldErrors.stock ? (
+            <p className="text-xs text-red-600">{fieldErrors.stock[0]}</p>
+          ) : null}
+        </>
+      )}
 
       <details className="rounded-lg border border-slate-200 p-3 text-sm">
         <summary className="cursor-pointer font-medium text-slate-700">
@@ -541,10 +670,22 @@ export function OfferForm({
         <p className="text-sm font-medium text-emerald-600">{successMessage}</p>
       ) : null}
 
-      <Button type="submit" disabled={isSubmitting || suppliers.length === 0}>
-        {isSubmitting ? "Menyimpan..." : "Simpan Penawaran"}
-      </Button>
-      {suppliers.length === 0 ? (
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" disabled={isSubmitting || (!isEdit && suppliers.length === 0)}>
+          {isSubmitting ? "Menyimpan..." : isEdit ? "Simpan Perubahan" : "Simpan Penawaran"}
+        </Button>
+        {isEdit ? (
+          <button
+            type="button"
+            onClick={() => onCancel?.()}
+            disabled={isSubmitting}
+            className="text-sm font-medium text-slate-600 hover:underline disabled:opacity-60"
+          >
+            Batal
+          </button>
+        ) : null}
+      </div>
+      {!isEdit && suppliers.length === 0 ? (
         <p className="text-xs text-slate-500">Belum ada supplier aktif untuk dipilih.</p>
       ) : null}
     </form>

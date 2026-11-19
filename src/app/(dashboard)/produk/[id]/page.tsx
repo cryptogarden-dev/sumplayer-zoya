@@ -87,6 +87,14 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   });
   const marginPercentFormatter = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
 
+  // Dipakai dua kali di bawah (form ubah per penawaran + form tambah) -
+  // dihitung sekali supaya tidak menduplikasi map yang sama.
+  const taxRateOptions = taxRates.map((rate) => ({
+    id: rate.id,
+    name: rate.name,
+    ratePercent: rate.ratePercent.toString(),
+  }));
+
   // Penawaran aktif berhaga untuk kartu "Rekomendasi Harga Jual" — harga
   // per kemasan SETELAH pajak (sama seperti margin), diurutkan termurah
   // dulu supaya penawaran termurah yang terpilih bawaan.
@@ -257,7 +265,28 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                         </p>
                       </div>
                     </div>
-                    <OfferActions offerId={offer.id} isActive={offer.isActive} />
+                    <OfferActions
+                      productId={product.id}
+                      unitFamily={product.unitFamily}
+                      taxRates={taxRateOptions}
+                      offer={{
+                        id: offer.id,
+                        supplierName: offer.supplier.supplierName,
+                        isActive: offer.isActive,
+                        packageType: offer.packageType,
+                        itemsPerPackage: offer.itemsPerPackage.toString(),
+                        contentPerItem: offer.contentPerItem.toString(),
+                        contentUnit: offer.contentUnit,
+                        minPurchasePackages: offer.minPurchasePackages.toString(),
+                        purchaseMultiplePackages: offer.purchaseMultiplePackages.toString(),
+                        supplierSkuOrName: offer.supplierSkuOrName ?? "",
+                        pricePerPackage: price ? price.pricePerPackage.toString() : "",
+                        taxStatus: price ? price.taxStatus : "NONE",
+                        taxRateId: price?.taxRate?.id ?? "",
+                        estimatedDeliveryDaysMin: offer.estimatedDeliveryDaysMin?.toString() ?? "",
+                        estimatedDeliveryDaysMax: offer.estimatedDeliveryDaysMax?.toString() ?? "",
+                      }}
+                    />
                   </Card>
                 );
               })}
@@ -312,11 +341,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               id: supplier.id,
               supplierName: supplier.supplierName,
             }))}
-            taxRates={taxRates.map((rate) => ({
-              id: rate.id,
-              name: rate.name,
-              ratePercent: rate.ratePercent.toString(),
-            }))}
+            taxRates={taxRateOptions}
           />
         </div>
       </div>
