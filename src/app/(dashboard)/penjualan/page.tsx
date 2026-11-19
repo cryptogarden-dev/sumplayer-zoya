@@ -5,6 +5,7 @@ import { getSalesSummary, listStockMovements } from "@/lib/server/repositories/p
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
+import { DeleteSaleButton } from "@/components/penjualan/DeleteSaleButton";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -139,7 +140,7 @@ export default async function PenjualanPage({
         />
       ) : (
         <div className="border-divider overflow-x-auto rounded-[20px] border bg-white">
-          <table className="w-full min-w-[760px] text-left text-sm">
+          <table className="w-full min-w-[860px] text-left text-sm">
             <thead>
               <tr className="border-divider border-b text-xs text-slate-500">
                 <th className="px-4 py-3 font-medium">Tanggal</th>
@@ -147,6 +148,7 @@ export default async function PenjualanPage({
                 <th className="px-4 py-3 font-medium">Jumlah</th>
                 <th className="px-4 py-3 font-medium">Harga Satuan</th>
                 <th className="px-4 py-3 font-medium">Total</th>
+                <th className="px-4 py-3 font-medium">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -170,6 +172,16 @@ export default async function PenjualanPage({
                     {movement.totalAmount === null
                       ? "—"
                       : formatRupiah(Number(movement.totalAmount))}
+                  </td>
+                  <td className="px-4 py-3">
+                    <DeleteSaleButton
+                      movementId={movement.id}
+                      productName={movement.product.productName}
+                      quantityLabel={`${numberFormatter.format(Number(movement.unitQuantity))} ${movement.unitLabel}`}
+                      totalAmount={
+                        movement.totalAmount === null ? null : Number(movement.totalAmount)
+                      }
+                    />
                   </td>
                 </tr>
               ))}

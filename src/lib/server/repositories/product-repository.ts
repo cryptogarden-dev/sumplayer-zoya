@@ -433,6 +433,40 @@ export async function recordSale(
 }
 
 /**
+ * Hapus satu penjualan (kepencet / salah catat) + kembalikan stoknya,
+ * dalam SATU transaksi supaya riwayat dan stok tidak pernah tidak
+ * sinkron. Penjualan dihapus permanen — seolah tidak pernah terjadi —
+ * jadi tidak ada baris PENYESUAIAN yang tertinggal. Mengembalikan null
+ * bila riwayatnya bukan penjualan milik bisnis ini.
+ */
+export async function deleteSale(
+  businessId: string,
+  movementId: string,
+): Promise<{ productId: string; stockQty: number } | null> {
+  return prisma.$transaction(async (tx) => {
+    const movement = await tx.stockMovement.findFirst({
+      where: { id: movementId, businessId, type: "PENJUALAN" },
+      select: { productId: true, quantityDeltaBase: true },
+    });
+    if (!movement) return null;
+    const product = await tx.product.findFirst({
+      where: { id: movement.productId, businessId },
+      select: { stockQty: true },
+    });
+    if (!product) return null;
+    // quantityDeltaBase penjualan selalu negatif, jadi dikurangi dari
+    // stok = stok bertambah kembali sejumlah yang terjual.
+    const nextQty = new Decimal(product.stockQty).minus(movement.quantityDeltaBase);
+    await tx.product.update({
+      where: { id: movement.productId },
+      data: { stockQty: nextQty },
+    });
+    await tx.stockMovement.delete({ where: { id: movementId } });
+    return { productId: movement.productId, stockQty: nextQty.toNumber() };
+  });
+}
+
+/**
  * Riwayat pergerakan stok, terbaru dulu — dipakai halaman Penjualan
  * (hanya PENJUALAN) dan riwayat produk. `take` dibatasi 100. `from`/`to`
  * membatasi createdAt setengah-terbuka [from, to) — dipakai filter
