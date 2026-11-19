@@ -7,6 +7,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
 import { formatRupiah } from "@/lib/format/currency";
 import { BASE_UNIT_LABELS } from "@/lib/format/units";
+import { computeCheapestBuyPricePerBaseUnit } from "@/lib/domain/pricing/margin";
+import { EditableSellPrice } from "@/components/stok/EditableSellPrice";
 
 export const metadata: Metadata = { title: "Stok Toko" };
 export const dynamic = "force-dynamic";
@@ -63,6 +65,19 @@ export default async function StokTokoPage({
       const stockQty = Number(product.stockQty);
       const threshold =
         product.lowStockThreshold === null ? null : Number(product.lowStockThreshold);
+      // Harga beli = penawaran aktif termurah per satuan dasar (setelah
+      // pajak), pola yang sama dengan halaman Produk.
+      const cheapestBuy = computeCheapestBuyPricePerBaseUnit(
+        product.supplierProducts
+          .filter((offer) => offer.prices[0])
+          .map((offer) => ({
+            pricePerPackage: offer.prices[0]!.pricePerPackage,
+            taxStatus: offer.prices[0]!.taxStatus,
+            taxRatePercent: offer.prices[0]!.taxRateValueSnapshot ?? 0,
+            totalPackageContent: offer.totalPackageContent,
+            supplierName: "",
+          })),
+      );
       return {
         id: product.id,
         productName: product.productName,
@@ -71,6 +86,7 @@ export default async function StokTokoPage({
         threshold,
         baseUnit: product.baseUnit,
         sellPricePerBaseUnit: product.sellPricePerBaseUnit,
+        cheapestBuyPerBaseUnit: cheapestBuy?.pricePerBaseUnit.toNumber() ?? null,
         status: stockStatus(stockQty, threshold),
       };
     })
@@ -132,12 +148,13 @@ export default async function StokTokoPage({
         />
       ) : (
         <div className="border-divider overflow-x-auto rounded-[20px] border bg-white">
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="w-full min-w-[760px] text-left text-sm">
             <thead>
               <tr className="border-divider border-b text-xs text-slate-500">
                 <th className="px-4 py-3 font-medium">Produk</th>
                 <th className="px-4 py-3 font-medium">Stok</th>
                 <th className="px-4 py-3 font-medium">Ambang</th>
+                <th className="px-4 py-3 font-medium">Harga Beli</th>
                 <th className="px-4 py-3 font-medium">Harga Jual</th>
               </tr>
             </thead>
@@ -173,9 +190,18 @@ export default async function StokTokoPage({
                       : `${numberFormatter.format(row.threshold)} ${BASE_UNIT_LABELS[row.baseUnit]}`}
                   </td>
                   <td className="px-4 py-3 text-slate-600">
-                    {row.sellPricePerBaseUnit === null
+                    {row.cheapestBuyPerBaseUnit === null
                       ? "—"
-                      : `${formatRupiah(Number(row.sellPricePerBaseUnit))}/${BASE_UNIT_LABELS[row.baseUnit]}`}
+                      : `${formatRupiah(row.cheapestBuyPerBaseUnit)}/${BASE_UNIT_LABELS[row.baseUnit]}`}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    <EditableSellPrice
+                      productId={row.id}
+                      initialValue={
+                        row.sellPricePerBaseUnit === null ? null : Number(row.sellPricePerBaseUnit)
+                      }
+                      unitLabel={BASE_UNIT_LABELS[row.baseUnit]}
+                    />
                   </td>
                 </tr>
               ))}
