@@ -10,6 +10,7 @@ export const metadata: Metadata = { title: "Penjualan" };
 export const dynamic = "force-dynamic";
 
 const dateFormatter = new Intl.DateTimeFormat("id-ID", {
+  timeZone: "Asia/Jakarta",
   day: "numeric",
   month: "short",
   year: "numeric",
