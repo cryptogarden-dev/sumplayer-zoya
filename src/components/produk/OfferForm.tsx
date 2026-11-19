@@ -298,7 +298,9 @@ export function OfferForm({
       setIsSubmitting(false);
       setSuccessMessage("Penawaran diperbarui.");
       router.refresh();
-      onSaved?.();
+      // Form ditutup sesaat kemudian supaya pesan sukses sempat terbaca -
+      // kalau ditutup langsung, pesan tidak pernah terlihat.
+      window.setTimeout(() => onSaved?.(), 1500);
       return;
     }
 
