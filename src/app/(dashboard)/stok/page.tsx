@@ -14,13 +14,14 @@ export const dynamic = "force-dynamic";
 const numberFormatter = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
 
 type StockStatus = "habis" | "menipis" | "aman";
-type StockFilter = "semua" | StockStatus;
+type StockFilter = "ada" | "semua" | StockStatus;
 
 const FILTERS: { key: StockFilter; label: string }[] = [
-  { key: "semua", label: "Semua" },
+  { key: "ada", label: "Ada Stok" },
   { key: "habis", label: "Habis" },
   { key: "menipis", label: "Menipis" },
   { key: "aman", label: "Aman" },
+  { key: "semua", label: "Semua" },
 ];
 
 /**
@@ -48,9 +49,11 @@ export default async function StokTokoPage({
 }) {
   const session = await requireSession();
   const { filter } = await searchParams;
+  // Default: hanya produk yang ada stoknya. Produk kosong (Habis) tidak
+  // dimasukkan ke daftar, tapi tetap bisa dilihat lewat filter Habis/Semua.
   const activeFilter: StockFilter = FILTERS.some((item) => item.key === filter)
     ? (filter as StockFilter)
-    : "semua";
+    : "ada";
 
   // Hanya produk aktif — stok produk nonaktif bukan stok toko yang dijual.
   const products = await listProducts(session.user.businessId);
@@ -74,13 +77,18 @@ export default async function StokTokoPage({
     .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
 
   const counts: Record<StockFilter, number> = {
+    ada: rows.filter((row) => row.status !== "habis").length,
     semua: rows.length,
     habis: rows.filter((row) => row.status === "habis").length,
     menipis: rows.filter((row) => row.status === "menipis").length,
     aman: rows.filter((row) => row.status === "aman").length,
   };
   const visibleRows =
-    activeFilter === "semua" ? rows : rows.filter((row) => row.status === activeFilter);
+    activeFilter === "semua"
+      ? rows
+      : activeFilter === "ada"
+        ? rows.filter((row) => row.status !== "habis")
+        : rows.filter((row) => row.status === activeFilter);
 
   return (
     <div>
@@ -100,7 +108,7 @@ export default async function StokTokoPage({
         {FILTERS.map((item) => (
           <Link
             key={item.key}
-            href={item.key === "semua" ? "/stok" : `/stok?filter=${item.key}`}
+            href={item.key === "ada" ? "/stok" : `/stok?filter=${item.key}`}
             className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               activeFilter === item.key
                 ? "border-slate bg-slate text-white"
