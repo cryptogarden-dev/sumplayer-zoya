@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
 import { formatRupiah } from "@/lib/format/currency";
 import { BASE_UNIT_LABELS, MEASUREMENT_UNIT_LABELS } from "@/lib/format/units";
-import { computeCheapestBuyPricePerBaseUnit } from "@/lib/domain/pricing/margin";
+import { computeCheapestBuyPricePerBaseUnit, computeMargin } from "@/lib/domain/pricing/margin";
 import { calculateSubtotal } from "@/lib/domain/pricing/subtotal";
 import { calculatePricePerBaseUnit } from "@/lib/domain/pricing/unit-price";
 import { EditableSellPrice } from "@/components/stok/EditableSellPrice";
@@ -16,6 +16,7 @@ export const metadata: Metadata = { title: "Stok Toko" };
 export const dynamic = "force-dynamic";
 
 const numberFormatter = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
+const marginPercentFormatter = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
 
 type StockStatus = "habis" | "menipis" | "aman";
 type StockFilter = "ada" | "semua" | StockStatus;
@@ -114,6 +115,18 @@ export default async function StokTokoPage({
           : product.unitFamily === "COUNT"
             ? `${numberFormatter.format(Number(cheapestOffer.itemsPerPackage))} ${MEASUREMENT_UNIT_LABELS.PCS}`
             : `${numberFormatter.format(Number(cheapestOffer.contentPerItem))} ${MEASUREMENT_UNIT_LABELS[cheapestOffer.contentUnit]}`;
+      // Harga beli per kemasan pakai aturan yang sama (beli termurah per
+      // satuan dasar x isi kemasan), dan selisih keuntungan = jual − beli.
+      const buyPerPackage =
+        cheapestBuy !== null && packageContent !== null && packageContent !== 1
+          ? cheapestBuy.pricePerBaseUnit.toNumber() * packageContent
+          : null;
+      const margin = computeMargin({
+        sellPricePerBaseUnit: product.sellPricePerBaseUnit,
+        buyPricePerBaseUnit: cheapestBuy?.pricePerBaseUnit,
+      });
+      const marginPerPackage =
+        sellPerPackage !== null && buyPerPackage !== null ? sellPerPackage - buyPerPackage : null;
       return {
         id: product.id,
         productName: product.productName,
@@ -124,7 +137,11 @@ export default async function StokTokoPage({
         sellPricePerBaseUnit: product.sellPricePerBaseUnit,
         cheapestBuyPerBaseUnit: cheapestBuy?.pricePerBaseUnit.toNumber() ?? null,
         sellPerPackage,
+        buyPerPackage,
         packageLabel,
+        marginAmount: margin === null ? null : margin.amount.toNumber(),
+        marginPercent: margin?.percent?.toNumber() ?? null,
+        marginPerPackage,
         status: stockStatus(stockQty, threshold),
       };
     })
@@ -186,7 +203,7 @@ export default async function StokTokoPage({
         />
       ) : (
         <div className="border-divider overflow-x-auto rounded-[20px] border bg-white">
-          <table className="w-full min-w-[760px] text-left text-sm">
+          <table className="w-full min-w-[880px] text-left text-sm">
             <thead>
               <tr className="border-divider border-b text-xs text-slate-500">
                 <th className="px-4 py-3 font-medium">Produk</th>
@@ -194,6 +211,7 @@ export default async function StokTokoPage({
                 <th className="px-4 py-3 font-medium">Ambang</th>
                 <th className="px-4 py-3 font-medium">Harga Beli</th>
                 <th className="px-4 py-3 font-medium">Harga Jual</th>
+                <th className="px-4 py-3 font-medium">Keuntungan</th>
               </tr>
             </thead>
             <tbody>
@@ -231,6 +249,11 @@ export default async function StokTokoPage({
                     {row.cheapestBuyPerBaseUnit === null
                       ? "—"
                       : `${formatRupiah(row.cheapestBuyPerBaseUnit)}/${BASE_UNIT_LABELS[row.baseUnit]}`}
+                    {row.buyPerPackage !== null && row.packageLabel !== null ? (
+                      <p className="mt-1 text-xs text-slate-500">
+                        {formatRupiah(row.buyPerPackage)} / {row.packageLabel}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 text-slate-600">
                     <EditableSellPrice
@@ -245,6 +268,26 @@ export default async function StokTokoPage({
                         {formatRupiah(row.sellPerPackage)} / {row.packageLabel}
                       </p>
                     ) : null}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {row.marginAmount === null ? (
+                      "—"
+                    ) : (
+                      <>
+                        {row.marginPercent !== null ? (
+                          <span
+                            className={`font-semibold ${row.marginPercent < 0 ? "text-red-600" : "text-emerald-600"}`}
+                          >
+                            {marginPercentFormatter.format(row.marginPercent)}%
+                          </span>
+                        ) : null}
+                        <p className="mt-1 text-xs text-slate-500">
+                          {row.marginPerPackage !== null && row.packageLabel !== null
+                            ? `${formatRupiah(row.marginPerPackage)} / ${row.packageLabel}`
+                            : `${formatRupiah(row.marginAmount)}/${BASE_UNIT_LABELS[row.baseUnit]}`}
+                        </p>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
