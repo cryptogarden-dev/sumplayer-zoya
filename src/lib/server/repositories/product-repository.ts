@@ -434,17 +434,33 @@ export async function recordSale(
 
 /**
  * Riwayat pergerakan stok, terbaru dulu — dipakai halaman Penjualan
- * (hanya PENJUALAN) dan riwayat produk. `take` dibatasi 100.
+ * (hanya PENJUALAN) dan riwayat produk. `take` dibatasi 100. `from`/`to`
+ * membatasi createdAt setengah-terbuka [from, to) — dipakai filter
+ * periode Penjualan (hari/minggu/bulan/custom, WIB).
  */
 export async function listStockMovements(
   businessId: string,
-  filters: { type?: "PENJUALAN" | "PENYESUAIAN"; productId?: string; take?: number } = {},
+  filters: {
+    type?: "PENJUALAN" | "PENYESUAIAN";
+    productId?: string;
+    take?: number;
+    from?: Date;
+    to?: Date;
+  } = {},
 ) {
   return prisma.stockMovement.findMany({
     where: {
       businessId,
       ...(filters.type ? { type: filters.type } : {}),
       ...(filters.productId ? { productId: filters.productId } : {}),
+      ...(filters.from || filters.to
+        ? {
+            createdAt: {
+              ...(filters.from ? { gte: filters.from } : {}),
+              ...(filters.to ? { lt: filters.to } : {}),
+            },
+          }
+        : {}),
     },
     orderBy: { createdAt: "desc" },
     take: Math.min(Math.max(filters.take ?? 50, 1), 100),
@@ -456,9 +472,23 @@ export async function listStockMovements(
 }
 
 /** Ringkasan penjualan: total omzet tercatat + jumlah transaksi. */
-export async function getSalesSummary(businessId: string) {
+export async function getSalesSummary(
+  businessId: string,
+  filters: { from?: Date; to?: Date } = {},
+) {
   const aggregate = await prisma.stockMovement.aggregate({
-    where: { businessId, type: "PENJUALAN" },
+    where: {
+      businessId,
+      type: "PENJUALAN",
+      ...(filters.from || filters.to
+        ? {
+            createdAt: {
+              ...(filters.from ? { gte: filters.from } : {}),
+              ...(filters.to ? { lt: filters.to } : {}),
+            },
+          }
+        : {}),
+    },
     _sum: { totalAmount: true },
     _count: { _all: true },
   });
