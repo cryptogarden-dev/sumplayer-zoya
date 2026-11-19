@@ -6,8 +6,10 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/ui/StatCard";
 import { formatRupiah } from "@/lib/format/currency";
-import { BASE_UNIT_LABELS } from "@/lib/format/units";
+import { BASE_UNIT_LABELS, MEASUREMENT_UNIT_LABELS } from "@/lib/format/units";
 import { computeCheapestBuyPricePerBaseUnit } from "@/lib/domain/pricing/margin";
+import { calculateSubtotal } from "@/lib/domain/pricing/subtotal";
+import { calculatePricePerBaseUnit } from "@/lib/domain/pricing/unit-price";
 import { EditableSellPrice } from "@/components/stok/EditableSellPrice";
 
 export const metadata: Metadata = { title: "Stok Toko" };
@@ -78,6 +80,40 @@ export default async function StokTokoPage({
             supplierName: "",
           })),
       );
+      // Kemasan penawaran termurah (aturan yang sama dengan Harga Beli) —
+      // dipakai untuk harga jual per kemasan, mis. bungkus 250 gram.
+      const pricedOffers = product.supplierProducts.filter((offer) => offer.prices[0]);
+      let cheapestOffer: (typeof pricedOffers)[number] | null = null;
+      let cheapestPerBaseUnit: ReturnType<typeof calculatePricePerBaseUnit> | null = null;
+      for (const offer of pricedOffers) {
+        const perBaseUnit = calculatePricePerBaseUnit(
+          calculateSubtotal({
+            packagesToBuy: 1,
+            pricePerPackage: offer.prices[0]!.pricePerPackage,
+            taxStatus: offer.prices[0]!.taxStatus,
+            taxRatePercent: offer.prices[0]!.taxRateValueSnapshot ?? 0,
+          }).pricePerPackageAfterTax,
+          offer.totalPackageContent,
+        );
+        if (cheapestPerBaseUnit === null || perBaseUnit.lessThan(cheapestPerBaseUnit)) {
+          cheapestPerBaseUnit = perBaseUnit;
+          cheapestOffer = offer;
+        }
+      }
+      // Harga jual per kemasan = harga jual per satuan dasar x isi kemasan
+      // penawaran termurah. Hanya bila kemasan bukan 1 satuan dasar (mis.
+      // bungkus 250 gram) dan produk sudah punya harga jual.
+      const packageContent = cheapestOffer ? Number(cheapestOffer.totalPackageContent) : null;
+      const sellPerPackage =
+        product.sellPricePerBaseUnit !== null && packageContent !== null && packageContent !== 1
+          ? Number(product.sellPricePerBaseUnit) * packageContent
+          : null;
+      const packageLabel =
+        cheapestOffer === null
+          ? null
+          : product.unitFamily === "COUNT"
+            ? `${numberFormatter.format(Number(cheapestOffer.itemsPerPackage))} ${MEASUREMENT_UNIT_LABELS.PCS}`
+            : `${numberFormatter.format(Number(cheapestOffer.contentPerItem))} ${MEASUREMENT_UNIT_LABELS[cheapestOffer.contentUnit]}`;
       return {
         id: product.id,
         productName: product.productName,
@@ -87,6 +123,8 @@ export default async function StokTokoPage({
         baseUnit: product.baseUnit,
         sellPricePerBaseUnit: product.sellPricePerBaseUnit,
         cheapestBuyPerBaseUnit: cheapestBuy?.pricePerBaseUnit.toNumber() ?? null,
+        sellPerPackage,
+        packageLabel,
         status: stockStatus(stockQty, threshold),
       };
     })
@@ -202,6 +240,11 @@ export default async function StokTokoPage({
                       }
                       unitLabel={BASE_UNIT_LABELS[row.baseUnit]}
                     />
+                    {row.sellPerPackage !== null && row.packageLabel !== null ? (
+                      <p className="mt-1 text-xs text-slate-500">
+                        {formatRupiah(row.sellPerPackage)} / {row.packageLabel}
+                      </p>
+                    ) : null}
                   </td>
                 </tr>
               ))}

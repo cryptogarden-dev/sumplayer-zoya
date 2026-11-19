@@ -48,6 +48,11 @@ export async function listProducts(businessId: string, filters: ProductListFilte
           // Isi kemasan + status pajak dipakai untuk menghitung harga beli
           // termurah PER SATUAN DASAR di kartu produk (perbaikan #5).
           totalPackageContent: true,
+          // Rincian kemasan dipakai halaman Stok Toko untuk harga jual
+          // per kemasan (mis. bungkus 250 gram) dari penawaran termurah.
+          itemsPerPackage: true,
+          contentPerItem: true,
+          contentUnit: true,
           prices: {
             orderBy: { createdAt: "desc" },
             take: 1,
